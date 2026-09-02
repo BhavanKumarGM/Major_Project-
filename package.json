@@ -1,0 +1,16 @@
+{
+  "name": "ai-hive-mind",
+  "version": "1.0.0",
+  "description": "AI Hive Mind - Multi-LLM Assistant with Prompt Refinement, Model Recommendation & Critic AI Evaluation",
+  "private": true,
+  "scripts": {
+    "install-all": "npm install && npm install --prefix server && npm install --prefix client",
+    "server": "node server/server.js",
+    "client": "npm run dev --prefix client",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "build": "npm run build --prefix client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
