@@ -5,14 +5,16 @@ import Workspace from './components/Workspace.jsx';
 import Dashboard from './components/Dashboard.jsx';
 import LegalAnalyzer from './components/LegalAnalyzer.jsx';
 import SettingsModal from './components/SettingsModal.jsx';
+import BenchmarkRanker from './components/BenchmarkRanker.jsx';
 import { api } from './services/api.js';
 
 export default function App() {
-  const [activeView, setActiveView] = useState('landing'); // 'landing' | 'workspace' | 'dashboard' | 'legal'
+  const [activeView, setActiveView] = useState('landing'); // 'landing' | 'workspace' | 'benchmark' | 'dashboard' | 'legal'
   const [models, setModels] = useState([]);
   const [criticWeights, setCriticWeights] = useState({});
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [initialPromptForWorkspace, setInitialPromptForWorkspace] = useState('');
+  const [initialModelsForWorkspace, setInitialModelsForWorkspace] = useState(null);
 
   // Load models from server
   useEffect(() => {
@@ -29,8 +31,11 @@ export default function App() {
     }
   };
 
-  const handleStartWorkspaceWithPrompt = (prompt = '') => {
+  const handleStartWorkspaceWithPrompt = (prompt = '', modelIds = null) => {
     setInitialPromptForWorkspace(prompt);
+    if (modelIds && Array.isArray(modelIds)) {
+      setInitialModelsForWorkspace(modelIds);
+    }
     setActiveView('workspace');
   };
 
@@ -57,7 +62,14 @@ export default function App() {
             models={models}
             criticWeights={criticWeights}
             initialPrompt={initialPromptForWorkspace}
+            initialModelIds={initialModelsForWorkspace}
             onOpenSettings={() => setIsSettingsOpen(true)}
+          />
+        )}
+
+        {activeView === 'benchmark' && (
+          <BenchmarkRanker 
+            onSendToWorkspace={(prompt, modelIds) => handleStartWorkspaceWithPrompt(prompt, modelIds)}
           />
         )}
 

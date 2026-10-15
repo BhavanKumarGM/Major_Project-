@@ -15,6 +15,7 @@ import { evaluateResponses } from './services/criticEngine.js';
 import { memoryService } from './services/memoryService.js';
 import { parseDocument } from './services/documentService.js';
 import { synthesizeResponses } from './services/synthesisService.js';
+import { BenchmarkRankerService } from './services/benchmarkRankerService.js';
 
 dotenv.config();
 
@@ -143,6 +144,26 @@ app.post('/api/preflight-prompt', (req, res) => {
       refinement,
       recommendations
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Benchmark Classification & Model Ranking
+app.post('/api/benchmark-ranker', (req, res) => {
+  try {
+    const { prompt } = req.body;
+    const rankingResult = BenchmarkRankerService.rankModelsForPrompt(prompt, configuredModels);
+    res.json(rankingResult);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/benchmark-categories', (req, res) => {
+  try {
+    const categories = BenchmarkRankerService.getAllCategories();
+    res.json({ categories });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

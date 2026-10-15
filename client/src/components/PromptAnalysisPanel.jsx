@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Sparkles, 
   BrainCircuit, 
@@ -13,8 +13,11 @@ import {
   HelpCircle,
   X,
   ChevronRight,
-  Layers
+  Layers,
+  Award,
+  Trophy
 } from 'lucide-react';
+import { api } from '../services/api.js';
 
 export default function PromptAnalysisPanel({
   analysis,
@@ -25,10 +28,31 @@ export default function PromptAnalysisPanel({
   onSelectRecommendedModels,
   onClose
 }) {
-  const [activeTab, setActiveTab] = useState('refinement'); // 'refinement' | 'breakdown' | 'recommendation'
+  const [activeTab, setActiveTab] = useState('refinement'); // 'refinement' | 'breakdown' | 'recommendation' | 'benchmark'
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editableRefined, setEditableRefined] = useState(refinement?.refinedPrompt || '');
+  const [benchmarkData, setBenchmarkData] = useState(null);
+  const [loadingBenchmark, setLoadingBenchmark] = useState(false);
+
+  useEffect(() => {
+    const promptToRank = refinement?.originalPrompt || refinement?.refinedPrompt;
+    if (promptToRank) {
+      loadBenchmarkRanking(promptToRank);
+    }
+  }, [refinement?.originalPrompt, refinement?.refinedPrompt]);
+
+  const loadBenchmarkRanking = async (prompt) => {
+    setLoadingBenchmark(true);
+    try {
+      const data = await api.rankModelsByBenchmark(prompt);
+      setBenchmarkData(data);
+    } catch (err) {
+      console.error('Failed to load benchmark ranker data:', err);
+    } finally {
+      setLoadingBenchmark(false);
+    }
+  };
 
   const handleCopy = (text) => {
     navigator.clipboard.writeText(text);
@@ -77,7 +101,14 @@ export default function PromptAnalysisPanel({
           onClick={() => setActiveTab('recommendation')}
         >
           <Bot size={14} />
-          <span>Models ({recommendations?.topRecommendation?.score || 95}%)</span>
+          <span>Models</span>
+        </button>
+        <button 
+          className={`panel-tab ${activeTab === 'benchmark' ? 'active' : ''}`}
+          onClick={() => setActiveTab('benchmark')}
+        >
+          <Award size={14} />
+          <span>Benchmarks</span>
         </button>
       </div>
 
@@ -293,6 +324,121 @@ export default function PromptAnalysisPanel({
           )}
         </div>
       )}
+
+      {/* Tab 4: Benchmark Leaderboard */}
+      {activeTab === 'benchmark' && (
+        <div className="tab-body">
+          {loadingBenchmark ? (
+            <div className="empty-state-text">
+              <div className="spinner-sm" style={{ margin: '0 auto 0.5rem auto' }} />
+              Classifying prompt and retrieving verified benchmark leaderboards...
+            </div>
+          ) : benchmarkData ? (
+            <div className="rec-wrap">
+              {/* Category Classification Spotlight */}
+              <div className="top-rec-card glass-card" style={{ borderColor: 'rgba(6, 182, 212, 0.4)' }}>
+                <div className="rec-badge-row">
+                  <span className="badge badge-indigo">
+                    {benchmarkData.categoryIcon} {benchmarkData.categoryName}
+                  </span>
+                  <span className="badge badge-emerald">
+                    {benchmarkData.classification?.confidence}% Conf.
+                  </span>
+                </div>
+                <p className="rec-reason" style={{ marginTop: '0.4rem', fontSize: '0.75rem' }}>
+                  {benchmarkData.categoryDescription}
+                </p>
+
+                {/* Primary Benchmarks List */}
+                <div style={{ marginTop: '0.6rem', padding: '0.5rem', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', fontSize: '0.72rem' }}>
+                  <div style={{ fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                    Active Benchmark Suite:
+                  </div>
+                  {benchmarkData.primaryBenchmarks?.map((bm, idx) => (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', padding: '0.1rem 0' }}>
+                      <span>{bm.name}</span>
+                      <strong style={{ color: 'var(--accent-cyan)' }}>{Math.round(bm.weight * 100)}%</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Top Ranked Model Banner */}
+              {benchmarkData.topRankedModel && (
+                <div className="top-rec-card glass-card" style={{ borderColor: 'rgba(245, 158, 11, 0.5)', background: 'rgba(245, 158, 11, 0.05)' }}>
+                  <div className="rec-badge-row">
+                    <span className="badge badge-emerald" style={{ background: '#f59e0b', color: '#000', fontWeight: 800 }}>
+                      <Trophy size={12} /> #1 BENCHMARK WINNER
+                    </span>
+                    <span className="rec-provider">{benchmarkData.topRankedModel.provider}</span>
+                  </div>
+                  <h4 className="rec-model-name">{benchmarkData.topRankedModel.name}</h4>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#fbbf24', margin: '0.2rem 0' }}>
+                    {benchmarkData.topRankedModel.compositeScore}<span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/100 Composite</span>
+                  </div>
+                  <p className="rec-reason">{benchmarkData.topRankedModel.keyStrength}</p>
+
+                  <div className="rec-actions">
+                    <button 
+                      className="btn btn-primary btn-sm flex-1"
+                      onClick={() => onSelectRecommendedModels([benchmarkData.topRankedModel.modelId])}
+                    >
+                      <Zap size={13} />
+                      <span>Select #1 Model</span>
+                    </button>
+                    {benchmarkData.runnerUpModel && (
+                      <button 
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => onSelectRecommendedModels([benchmarkData.topRankedModel.modelId, benchmarkData.runnerUpModel.modelId])}
+                        title="Compare Top 2 Benchmark Performers"
+                      >
+                        <Layers size={13} />
+                        <span>Compare Top 2</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* All Ranked Models */}
+              <div className="all-models-list">
+                <span className="list-title">Category Benchmark Leaderboard</span>
+                {benchmarkData.rankedModels?.map((m) => (
+                  <div key={m.modelId} className="model-score-row glass-card" style={m.rank === 1 ? { borderColor: 'rgba(245, 158, 11, 0.4)' } : {}}>
+                    <div className="model-left">
+                      <span className="model-avatar" style={{ fontSize: '0.9rem', fontWeight: 800 }}>
+                        {m.rank === 1 ? '🥇' : m.rank === 2 ? '🥈' : `#${m.rank}`}
+                      </span>
+                      <div>
+                        <div className="model-name-text">
+                          {m.name} <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>({m.provider})</span>
+                        </div>
+                        <div className="model-rationale-text" style={{ fontSize: '0.7rem' }}>
+                          {m.benchmarkMetrics?.[0]?.name.split(' ')[0]}: <strong>{m.benchmarkMetrics?.[0]?.value}{m.benchmarkMetrics?.[0]?.unit}</strong> | LMSYS: <strong>{m.arenaElo}</strong>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="model-right">
+                      <span className="score-num" style={m.rank === 1 ? { color: '#fbbf24' } : {}}>{m.compositeScore}</span>
+                      <button 
+                        className="btn btn-secondary btn-xs"
+                        onClick={() => onSelectRecommendedModels([m.modelId])}
+                      >
+                        Select
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="empty-state-text">
+              Enter a prompt to calculate verifiable benchmark leaderboards.
+            </div>
+          )}
+        </div>
+      )}
+
 
       <style>{`
         .analysis-panel {

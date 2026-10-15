@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Layers, BarChart3, Settings, ShieldCheck, Scale, Cpu } from 'lucide-react';
+import { Sparkles, Layers, BarChart3, Settings, ShieldCheck, Scale, Cpu, Award } from 'lucide-react';
 
 export default function Navbar({ activeView, setActiveView, onOpenSettings }) {
   return (
@@ -31,6 +31,13 @@ export default function Navbar({ activeView, setActiveView, onOpenSettings }) {
           >
             <Sparkles size={16} />
             AI Workspace
+          </button>
+          <button 
+            className={`nav-btn ${activeView === 'benchmark' ? 'active' : ''}`}
+            onClick={() => setActiveView('benchmark')}
+          >
+            <Award size={16} />
+            Benchmark Ranker
           </button>
           <button 
             className={`nav-btn ${activeView === 'dashboard' ? 'active' : ''}`}

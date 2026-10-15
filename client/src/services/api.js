@@ -88,6 +88,21 @@ export const api = {
     return handleResponse(res);
   },
 
+  // Benchmark Classification & Ranking
+  async rankModelsByBenchmark(prompt) {
+    const res = await fetch(`${BASE_URL}/benchmark-ranker`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    return handleResponse(res);
+  },
+
+  async getBenchmarkCategories() {
+    const res = await fetch(`${BASE_URL}/benchmark-categories`);
+    return handleResponse(res);
+  },
+
   // Generation & Critic
   async generateResponses({ prompt, modelIds, conversationId, documentContext }) {
     const res = await fetch(`${BASE_URL}/generate`, {

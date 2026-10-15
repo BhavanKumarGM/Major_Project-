@@ -32,6 +32,7 @@ export default function Workspace({
   models = [], 
   criticWeights, 
   initialPrompt = '', 
+  initialModelIds = null,
   onOpenSettings 
 }) {
   // Conversations State
@@ -70,13 +71,25 @@ export default function Workspace({
     loadConversations();
   }, []);
 
-  // Set initial prompt if passed from landing
+  // Set initial prompt if passed from landing or benchmark ranker
   useEffect(() => {
     if (initialPrompt) {
       setInputPrompt(initialPrompt);
       runPreflight(initialPrompt);
     }
   }, [initialPrompt]);
+
+  // Set initial models if passed from benchmark ranker
+  useEffect(() => {
+    if (initialModelIds && initialModelIds.length > 0) {
+      setSelectedModelIds(initialModelIds);
+      if (initialModelIds.length === 1) {
+        setActiveMode('single');
+      } else {
+        setActiveMode('compare');
+      }
+    }
+  }, [initialModelIds]);
 
   const loadConversations = async () => {
     try {
