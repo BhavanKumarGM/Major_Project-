@@ -88,27 +88,27 @@ export class LLMService {
     try {
       if (model.id === 'sarvam-105b' && this.apiKeys.sarvam) {
         const result = await this.callSarvam(fullPrompt, conversationContext);
-        return { ...result, modelId: model.id, modelName: model.name, provider: model.provider, latency: Date.now() - startTime, isLive: true };
+        return { ...result, modelId: model.id, modelName: model.name, provider: model.provider, avatar: model.avatar, badgeColor: model.badgeColor, latency: Date.now() - startTime, isLive: true };
       }
       if (model.id === 'gpt-4o' && this.apiKeys.openai) {
         const result = await this.callOpenAI(fullPrompt, conversationContext);
-        return { ...result, modelId: model.id, modelName: model.name, provider: model.provider, latency: Date.now() - startTime, isLive: true };
+        return { ...result, modelId: model.id, modelName: model.name, provider: model.provider, avatar: model.avatar, badgeColor: model.badgeColor, latency: Date.now() - startTime, isLive: true };
       }
       if (model.id === 'gemini-2-0-flash' && this.apiKeys.gemini) {
         const result = await this.callGemini(fullPrompt, conversationContext);
-        return { ...result, modelId: model.id, modelName: model.name, provider: model.provider, latency: Date.now() - startTime, isLive: true };
+        return { ...result, modelId: model.id, modelName: model.name, provider: model.provider, avatar: model.avatar, badgeColor: model.badgeColor, latency: Date.now() - startTime, isLive: true };
       }
       if (model.id === 'llama-3-3-70b' && this.apiKeys.groq) {
         const result = await this.callGroq(fullPrompt, conversationContext);
-        return { ...result, modelId: model.id, modelName: model.name, provider: model.provider, latency: Date.now() - startTime, isLive: true };
+        return { ...result, modelId: model.id, modelName: model.name, provider: model.provider, avatar: model.avatar, badgeColor: model.badgeColor, latency: Date.now() - startTime, isLive: true };
       }
       if (model.id === 'claude-3-5-sonnet' && this.apiKeys.anthropic) {
         const result = await this.callAnthropic(fullPrompt, conversationContext);
-        return { ...result, modelId: model.id, modelName: model.name, provider: model.provider, latency: Date.now() - startTime, isLive: true };
+        return { ...result, modelId: model.id, modelName: model.name, provider: model.provider, avatar: model.avatar, badgeColor: model.badgeColor, latency: Date.now() - startTime, isLive: true };
       }
       if (model.id === 'ollama-local') {
         const result = await this.callOllama(fullPrompt, conversationContext);
-        return { ...result, modelId: model.id, modelName: model.name, provider: model.provider, latency: Date.now() - startTime, isLive: true };
+        return { ...result, modelId: model.id, modelName: model.name, provider: model.provider, avatar: model.avatar, badgeColor: model.badgeColor, latency: Date.now() - startTime, isLive: true };
       }
     } catch (err) {
       console.warn(`[LLMService] Live call for ${model.id} failed (${err.message}). Falling back to simulation engine.`);
@@ -226,7 +226,7 @@ export class LLMService {
   }
 
   async callGemini(prompt, context) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.apiKeys.gemini}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKeys.gemini}`;
     const contents = context.map(m => ({
       role: m.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: m.text || m.content }]
@@ -264,6 +264,9 @@ export class LLMService {
     const messages = context.map(m => ({ role: m.role, content: m.text || m.content }));
     messages.push({ role: 'user', content: prompt });
 
+    // Use available chat model on Groq
+    const model = 'openai/gpt-oss-120b';
+
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -271,7 +274,7 @@ export class LLMService {
         Authorization: `Bearer ${this.apiKeys.groq}`
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model,
         messages,
         temperature: 0.7
       })
