@@ -34,7 +34,7 @@ const upload = multer({
 let configuredModels = JSON.parse(JSON.stringify(DEFAULT_MODELS));
 let criticWeights = { ...DEFAULT_CRITIC_WEIGHTS };
 const apiKeys = {
-  sarvam: process.env.SARVAM_API_KEY || 'sk_btq0547w_Xt3GZho7HYMkI5u0BBJHj2m1',
+  sarvam: process.env.SARVAM_API_KEY || '',
   openai: process.env.OPENAI_API_KEY || '',
   gemini: process.env.GEMINI_API_KEY || '',
   anthropic: process.env.ANTHROPIC_API_KEY || '',
@@ -209,14 +209,37 @@ app.post('/api/generate', async (req, res) => {
 });
 
 // 6. Critic AI Evaluation
-app.post('/api/critic-evaluate', (req, res) => {
+app.post('/api/critic-evaluate', async (req, res) => {
   try {
-    const { originalPrompt, refinedPrompt, responses, weights } = req.body;
-    const evaluation = evaluateResponses(
+    const {
       originalPrompt,
       refinedPrompt,
       responses,
-      weights || criticWeights
+      weights,
+      analysis,
+      documentContext,
+      referenceAnswer,
+      options,
+      revisionSettings
+    } = req.body;
+
+    if (!originalPrompt && (!responses || responses.length === 0)) {
+      return res.status(400).json({ error: 'Missing prompt and candidate responses for evaluation.' });
+    }
+
+    const evaluation = await evaluateResponses(
+      originalPrompt,
+      refinedPrompt,
+      responses,
+      weights || criticWeights,
+      {
+        analysis,
+        documentContext,
+        referenceAnswer,
+        options,
+        revisionSettings,
+        llmService
+      }
     );
     res.json(evaluation);
   } catch (err) {

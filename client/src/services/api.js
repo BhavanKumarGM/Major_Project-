@@ -113,11 +113,31 @@ export const api = {
     return handleResponse(res);
   },
 
-  async criticEvaluate({ originalPrompt, refinedPrompt, responses, weights }) {
+  async criticEvaluate({
+    originalPrompt,
+    refinedPrompt,
+    responses,
+    weights,
+    analysis,
+    documentContext,
+    referenceAnswer,
+    options,
+    revisionSettings
+  }) {
     const res = await fetch(`${BASE_URL}/critic-evaluate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ originalPrompt, refinedPrompt, responses, weights })
+      body: JSON.stringify({
+        originalPrompt,
+        refinedPrompt,
+        responses,
+        weights,
+        analysis,
+        documentContext,
+        referenceAnswer,
+        options,
+        revisionSettings
+      })
     });
     return handleResponse(res);
   },

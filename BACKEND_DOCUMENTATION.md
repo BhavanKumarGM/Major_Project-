@@ -78,18 +78,41 @@ graph TD
 - Fires non-blocking parallel HTTP requests with timeouts and error isolation.
 - Converts unified prompt and history objects into provider-specific payloads (OpenAI Chat format, Anthropic Messages format, Google Gemini Content format).
 
-### 3.5 Critic AI Evaluation
-- Scores responses across 5 standardized metrics:
-  - **Correctness** (35%)
-  - **Relevance** (20%)
-  - **Completeness** (20%)
-  - **Clarity** (15%)
-  - **Instruction Following** (10%)
-- Computes composite weighted scores and highlights strengths and weaknesses for each output.
+### 3.5 Evidence-Based Evaluation Agent (Upgraded Critic AI)
+The evaluation system operates as a hybrid multi-layer architecture:
+1. **Deterministic Rule Validation (`server/services/evaluation/ruleValidator.js`)**:
+   - Weight validation and normalization (finite, non-negative, normalized to 1.0).
+   - Verifies empty, truncated, or malformed responses.
+   - Enforces exact JSON/schema formatting.
+   - Strict negative constraint checking (e.g. prohibited external libraries, prohibited recursion).
+   - Incomplete generation detection (unclosed code fences, cut-offs).
+2. **Task-Specific Verification (`server/services/evaluation/taskValidators.js`)**:
+   - `CodingTaskValidator`: code-fence checks, static syntax delimiter validation, edge-case inspection, and explicit sandbox disclaimer (never claims execution when isolated sandboxing was unperformed).
+   - `ResearchTaskValidator`: checks assertions against supplied document context; unsupported claims without evidence are marked as `unverified` / `insufficient_evidence`, not false.
+   - `SummarizationTaskValidator`: source material vocabulary overlap and executive bullet-point structure.
+   - `GeneralReasoningValidator`: logical consistency and formatting.
+3. **Requirement Coverage Analysis (`server/services/evaluation/requirementAnalyzer.js`)**:
+   - Extracts discrete requirements from original prompt and constraints.
+   - Detects prompt-refinement conflicts where refinement altered original intent.
+   - Calculates discrete requirement satisfaction percentages.
+4. **Root-Cause Diagnostics (`server/services/evaluation/diagnostics.js`)**:
+   - Structured categories: `factual_error`, `unsupported_claim`, `logical_contradiction`, `missing_requirement`, `instruction_violation`, `format_violation`, `incomplete_response`, `code_validation_failure`, `insufficient_evidence`, `provider_error`, `evaluation_error`.
+   - Stage attribution: `prompt_refinement`, `decision_model`, `provider_or_execution`, `evaluation_agent`, `input_or_context`, `unknown`.
+5. **LLM-as-a-Judge Layer (`server/services/evaluation/llmJudge.js`)**:
+   - Independent evaluator prompt with prompt injection resistance (untrusted candidate content directive).
+   - Anchored rubric scoring across 5 dimensions: Correctness (35%), Relevance (20%), Completeness (20%), Clarity (15%), Instruction Following (10%).
+   - Graceful fallback to degraded / deterministic-only mode if external LLM judge is disabled or fails.
+6. **Controlled Revision Loop (`server/services/evaluation/revisionLoop.js`)**:
+   - Bounded evaluation feedback with max 2 retry attempts.
+   - Routes corrections to refinement or generation depending on root-cause attribution.
+7. **Synthesis Verification (`server/services/synthesisService.js`)**:
+   - Eliminates hardcoded or fabricated claims.
+   - Independently assesses synthesized consensus against user prompt requirements.
 
 ### 3.6 Provider-Neutral Memory & Branching
 - Avoids provider lock-in by storing conversation turns as neutral state objects.
 - Allows users to select any response branch to continue the conversation while retaining access to alternative branches.
+- Measures empirical user alignment with critic recommendations in telemetry.
 
 ---
 
@@ -102,8 +125,8 @@ graph TD
 | `POST` | `/api/refine-prompt` | Refines prompt and generates step-by-step checklist |
 | `POST` | `/api/recommend-models` | Computes model suitability scores |
 | `POST` | `/api/generate` | Dispatches parallel queries across selected LLMs |
-| `POST` | `/api/critic-evaluate` | Computes 5-dimension Critic AI evaluation matrix |
-| `POST` | `/api/synthesize` | Generates consolidated consensus response |
+| `POST` | `/api/critic-evaluate` | Computes evidence-based Critic AI evaluation matrix & diagnostics |
+| `POST` | `/api/synthesize` | Generates verified consensus response with quality scoring |
 | `POST` | `/api/upload` | Ingests PDF / DOCX / TXT documents |
 | `GET` | `/api/models` | Lists configured model registry & scoring weights |
 | `POST` | `/api/models/update` | Updates active models or Critic weights |
@@ -116,13 +139,19 @@ graph TD
 | `POST` | `/api/conversations/:id/turn` | Adds a new turn with multi-model candidate responses |
 | `POST` | `/api/conversations/:id/branch` | Selects active continuation branch |
 | `POST` | `/api/conversations/:id/synthesis`| Saves consensus synthesis to turn |
-| `GET` | `/api/stats` | Returns latency, model usage, and selection telemetry |
+| `GET` | `/api/stats` | Returns latency, model usage, evaluation quality, and selection telemetry |
 
 ---
 
 ## 5. Verification & Testing
 
-To run the automated end-to-end test suite:
+To run the automated 20-scenario deterministic evaluation test suite (runs 100% offline without API keys):
+```bash
+npm test
+```
+
+To run the full live end-to-end workflow verification (requires backend server running on port 5050):
 ```bash
 node server/verify-e2e.js
 ```
+

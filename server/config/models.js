@@ -20,46 +20,6 @@ export const DEFAULT_MODELS = [
     isRecommendedDefault: true
   },
   {
-    id: "gpt-4o",
-    name: "GPT-4o",
-    provider: "OpenAI",
-    avatar: "🧠",
-    badgeColor: "#10a37f",
-    description: "Flagship multimodal intelligence with superior reasoning and versatility.",
-    contextWindow: "128k tokens",
-    latencyAvg: 1100,
-    capabilities: {
-      coding: 94,
-      reasoning: 95,
-      creative: 92,
-      summarization: 93,
-      general: 96,
-      speed: 85
-    },
-    status: "configured",
-    isRecommendedDefault: true
-  },
-  {
-    id: "claude-3-5-sonnet",
-    name: "Claude 3.5 Sonnet",
-    provider: "Anthropic",
-    avatar: "🎭",
-    badgeColor: "#d97706",
-    description: "State-of-the-art code generation, nuanced reasoning, and articulate writing.",
-    contextWindow: "200k tokens",
-    latencyAvg: 1250,
-    capabilities: {
-      coding: 97,
-      reasoning: 96,
-      creative: 95,
-      summarization: 94,
-      general: 95,
-      speed: 82
-    },
-    status: "configured",
-    isRecommendedDefault: true
-  },
-  {
     id: "gemini-2-0-flash",
     name: "Gemini 2.0 Flash",
     provider: "Google",
@@ -77,7 +37,7 @@ export const DEFAULT_MODELS = [
       speed: 98
     },
     status: "configured",
-    isRecommendedDefault: false
+    isRecommendedDefault: true
   },
   {
     id: "llama-3-3-70b",
@@ -97,27 +57,7 @@ export const DEFAULT_MODELS = [
       speed: 99
     },
     status: "configured",
-    isRecommendedDefault: false
-  },
-  {
-    id: "deepseek-r1",
-    name: "DeepSeek R1",
-    provider: "DeepSeek",
-    avatar: "🔬",
-    badgeColor: "#6366f1",
-    description: "Advanced chain-of-thought open reasoning model specializing in math and complex logic.",
-    contextWindow: "64k tokens",
-    latencyAvg: 1600,
-    capabilities: {
-      coding: 96,
-      reasoning: 98,
-      creative: 80,
-      summarization: 87,
-      general: 91,
-      speed: 70
-    },
-    status: "configured",
-    isRecommendedDefault: false
+    isRecommendedDefault: true
   },
   {
     id: "ollama-local",

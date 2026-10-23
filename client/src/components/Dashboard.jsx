@@ -133,6 +133,39 @@ export default function Dashboard({ models = [] }) {
               </table>
             </div>
           </div>
+
+          {/* Evidence-Based Evaluation Quality & Diagnostic Telemetry */}
+          {stats.evaluationMetrics && (
+            <div className="model-stats-card glass-panel" style={{ marginTop: '1.25rem' }}>
+              <h3 className="section-heading">Evidence Evaluation Diagnostics & Telemetry</h3>
+              <div className="eval-metrics-grid">
+                <div className="eval-metric-box">
+                  <span className="eval-metric-lbl">Evaluations Conducted</span>
+                  <span className="eval-metric-val text-purple">{stats.evaluationMetrics.evaluationsCompleted}</span>
+                  <span className="eval-metric-sub">{stats.evaluationMetrics.evaluationsDegraded} in degraded rule fallback</span>
+                </div>
+                <div className="eval-metric-box">
+                  <span className="eval-metric-lbl">Critical Failures Intercepted</span>
+                  <span className="eval-metric-val text-rose">{stats.evaluationMetrics.criticalFailuresDetected}</span>
+                  <span className="eval-metric-sub">Negative constraint & syntax violations</span>
+                </div>
+                <div className="eval-metric-box">
+                  <span className="eval-metric-lbl">Avg Requirement Coverage</span>
+                  <span className="eval-metric-val text-cyan">{stats.evaluationMetrics.averageRequirementCoverage}%</span>
+                  <span className="eval-metric-sub">Discrete prompt requirements verified</span>
+                </div>
+                <div className="eval-metric-box">
+                  <span className="eval-metric-lbl">Human vs Critic Alignment</span>
+                  <span className="eval-metric-val text-emerald">
+                    {stats.evaluationMetrics.userAgreementRate != null ? `${stats.evaluationMetrics.userAgreementRate}%` : 'N/A'}
+                  </span>
+                  <span className="eval-metric-sub">
+                    {stats.evaluationMetrics.isAgreementMeasured ? 'Empirically measured user choices' : 'Awaiting user selections'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -246,10 +279,39 @@ export default function Dashboard({ models = [] }) {
           align-items: center;
           gap: 0.6rem;
         }
-        .num-cell {
-          font-family: var(--font-mono);
-          font-weight: 600;
+        .eval-metrics-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 1rem;
         }
+        .eval-metric-box {
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.07);
+          border-radius: var(--radius-sm);
+          padding: 1rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.35rem;
+        }
+        .eval-metric-lbl {
+          font-size: 0.72rem;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          font-weight: 700;
+        }
+        .eval-metric-val {
+          font-family: var(--font-display);
+          font-size: 1.5rem;
+          font-weight: 800;
+        }
+        .eval-metric-sub {
+          font-size: 0.72rem;
+          color: var(--text-secondary);
+        }
+        .text-purple { color: #c084fc; }
+        .text-rose { color: #fb7185; }
+        .text-cyan { color: #22d3ee; }
+        .text-emerald { color: #34d399; }
       `}</style>
     </div>
   );

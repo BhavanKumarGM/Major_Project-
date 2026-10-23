@@ -13,7 +13,18 @@ class MemoryService {
       modelUsage: {},
       averageLatency: {},
       criticWins: {},
-      userSelections: {}
+      userSelections: {},
+      // Extended evaluation telemetry
+      evaluationsCompleted: 0,
+      evaluationsDegraded: 0,
+      criticalFailuresDetected: 0,
+      totalRequirementCoverageSum: 0,
+      totalRequirementCoverageCount: 0,
+      revisionsAttempted: 0,
+      revisionsImproved: 0,
+      revisionsRegressed: 0,
+      userAgreementsWithCritic: 0,
+      totalUserBranchDecisions: 0
     };
   }
 
@@ -123,6 +134,15 @@ class MemoryService {
       
       // Update analytics
       this.analytics.userSelections[selectedModelId] = (this.analytics.userSelections[selectedModelId] || 0) + 1;
+      
+      // Track agreement between user choice and evaluator recommendation
+      if (turn.criticEvaluation?.winner?.modelId) {
+        this.analytics.totalUserBranchDecisions += 1;
+        if (turn.criticEvaluation.winner.modelId === selectedModelId) {
+          this.analytics.userAgreementsWithCritic += 1;
+        }
+      }
+
       return turn;
     }
     return null;
@@ -193,6 +213,36 @@ class MemoryService {
     if (turn.selectedModelId) {
       this.analytics.userSelections[turn.selectedModelId] = (this.analytics.userSelections[turn.selectedModelId] || 0) + 1;
     }
+
+    // Extended evaluation analytics
+    if (turn.criticEvaluation) {
+      const evalData = turn.criticEvaluation;
+      this.analytics.evaluationsCompleted += 1;
+
+      if (evalData.evaluationStatus === 'degraded') {
+        this.analytics.evaluationsDegraded += 1;
+      }
+
+      if (typeof evalData.criticalFailures === 'number') {
+        this.analytics.criticalFailuresDetected += evalData.criticalFailures;
+      }
+
+      if (evalData.requirementCoverage?.coveragePercent != null) {
+        this.analytics.totalRequirementCoverageSum += evalData.requirementCoverage.coveragePercent;
+        this.analytics.totalRequirementCoverageCount += 1;
+      }
+
+      if (evalData.revisionsAttempted) {
+        this.analytics.revisionsAttempted += evalData.revisionsAttempted;
+      }
+
+      if (Array.isArray(evalData.revisionHistory)) {
+        evalData.revisionHistory.forEach(rev => {
+          if (rev.improved) this.analytics.revisionsImproved += 1;
+          else if (rev.scoreDelta < 0) this.analytics.revisionsRegressed += 1;
+        });
+      }
+    }
   }
 
   getAnalytics() {
@@ -201,12 +251,31 @@ class MemoryService {
       avgLatency[id] = Math.round(data.sum / data.count);
     }
 
+    const avgReqCoverage = this.analytics.totalRequirementCoverageCount > 0
+      ? Math.round(this.analytics.totalRequirementCoverageSum / this.analytics.totalRequirementCoverageCount)
+      : 0;
+
+    const agreementRate = this.analytics.totalUserBranchDecisions > 0
+      ? Math.round((this.analytics.userAgreementsWithCritic / this.analytics.totalUserBranchDecisions) * 100)
+      : null;
+
     return {
       totalRequests: this.analytics.totalRequests,
       modelUsage: this.analytics.modelUsage,
       averageLatency: avgLatency,
       criticWins: this.analytics.criticWins,
-      userSelections: this.analytics.userSelections
+      userSelections: this.analytics.userSelections,
+      evaluationMetrics: {
+        evaluationsCompleted: this.analytics.evaluationsCompleted,
+        evaluationsDegraded: this.analytics.evaluationsDegraded,
+        criticalFailuresDetected: this.analytics.criticalFailuresDetected,
+        averageRequirementCoverage: avgReqCoverage,
+        revisionsAttempted: this.analytics.revisionsAttempted,
+        revisionsImproved: this.analytics.revisionsImproved,
+        revisionsRegressed: this.analytics.revisionsRegressed,
+        userAgreementRate: agreementRate,
+        isAgreementMeasured: this.analytics.totalUserBranchDecisions > 0
+      }
     };
   }
 }

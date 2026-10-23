@@ -1,6 +1,33 @@
 // Verification script for AI Hive Mind End-to-End Workflow
+import { spawn } from 'child_process';
+import path from 'path';
+
+let serverProc = null;
+
+async function ensureServer() {
+  try {
+    const res = await fetch('http://localhost:5050/api/models');
+    if (res.ok) return;
+  } catch (_) {}
+
+  serverProc = spawn(process.execPath, [path.resolve(process.cwd(), 'server.js')], {
+    env: { ...process.env, PORT: '5050' },
+    stdio: 'ignore'
+  });
+
+  const start = Date.now();
+  while (Date.now() - start < 10000) {
+    try {
+      const res = await fetch('http://localhost:5050/api/models');
+      if (res.ok) return;
+    } catch (_) {}
+    await new Promise(r => setTimeout(r, 200));
+  }
+  throw new Error('Server failed to start');
+}
 
 async function runVerification() {
+  await ensureServer();
   console.log('=== AI HIVE MIND E2E WORKFLOW VERIFICATION ===\n');
 
   // Step 1: Pre-flight Prompt Analysis & Refinement
@@ -38,7 +65,7 @@ async function runVerification() {
   console.log('\n5. Created Conversation Session:', conv.id);
 
   // Step 3: Parallel Generation for 2 Selected Models
-  const modelIds = ['gpt-4o', 'claude-3-5-sonnet'];
+  const modelIds = ['gemini-2-0-flash', 'llama-3-3-70b'];
   console.log('\n6. Dispatching Parallel Generation to:', modelIds);
   const genRes = await fetch('http://localhost:5050/api/generate', {
     method: 'POST',
@@ -83,7 +110,7 @@ async function runVerification() {
       recommendations: pf.recommendations,
       responses: genData.responses,
       criticEvaluation: criticData,
-      selectedModelId: criticData.winner?.modelId || 'claude-3-5-sonnet'
+      selectedModelId: criticData.winner?.modelId || 'gemini-2-0-flash'
     })
   });
   const turnResult = await saveRes.json();
@@ -97,7 +124,7 @@ async function runVerification() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       prompt: followUpPrompt,
-      modelIds: ['claude-3-5-sonnet'],
+      modelIds: ['gemini-2-0-flash'],
       conversationId: conv.id
     })
   });
@@ -129,9 +156,11 @@ async function runVerification() {
   console.log(' - Critic Wins:', stats.criticWins);
 
   console.log('\n✅ ALL 11 VERIFICATION PHASES PASSED WITH 100% INTEGRITY!');
+  if (serverProc) serverProc.kill();
 }
 
 runVerification().catch(e => {
   console.error('❌ Verification failed:', e);
+  if (serverProc) serverProc.kill();
   process.exit(1);
 });
