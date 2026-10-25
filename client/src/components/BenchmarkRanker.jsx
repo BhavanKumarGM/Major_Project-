@@ -428,6 +428,11 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
                   </tbody>
                 </table>
               </div>
+              {rankingData.unrankedModels?.length > 0 && (
+                <p className="text-muted" style={{ marginTop: '0.75rem', fontSize: '0.8rem' }}>
+                  Not ranked (no benchmark data): {rankingData.unrankedModels.map(m => m.name).join(', ')}
+                </p>
+              )}
             </div>
           </div>
         </div>

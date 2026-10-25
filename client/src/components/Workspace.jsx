@@ -43,7 +43,7 @@ export default function Workspace({
 
   // Mode Selection: 'auto' | 'single' | 'compare' | 'critic'
   const [activeMode, setActiveMode] = useState('compare'); 
-  const [selectedModelIds, setSelectedModelIds] = useState(['gemini-2-0-flash', 'llama-3-3-70b']);
+  const [selectedModelIds, setSelectedModelIds] = useState(['gemini-2-5-flash', 'llama-3-3-70b']);
 
   // Composer State
   const [inputPrompt, setInputPrompt] = useState(initialPrompt);
@@ -222,7 +222,7 @@ export default function Workspace({
       }
 
       // 3. Parallel Multi-Model Generation
-      const targetModelIds = selectedModelIds.length > 0 ? selectedModelIds : ['gemini-2-0-flash', 'llama-3-3-70b'];
+      const targetModelIds = selectedModelIds.length > 0 ? selectedModelIds : ['gemini-2-5-flash', 'llama-3-3-70b'];
       const genResult = await api.generateResponses({
         prompt: pf.refinement?.refinedPrompt || promptToSend,
         modelIds: targetModelIds,

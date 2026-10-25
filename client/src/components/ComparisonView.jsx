@@ -449,6 +449,12 @@ export default function ComparisonView({
                       {resp.isLive && (
                         <span className="badge badge-emerald badge-xs">Live API</span>
                       )}
+                      {resp.isSimulated && (
+                        <span className="badge badge-amber badge-xs" title="No API key configured for this provider; this is demo output, not a real model answer.">Simulated</span>
+                      )}
+                      {resp.status === 'error' && (
+                        <span className="badge badge-rose badge-xs" title={resp.errorMessage}>Error</span>
+                      )}
                       {resp.revisionAttempt && (
                         <span className="badge badge-indigo badge-xs">Revision v{resp.revisionAttempt}</span>
                       )}

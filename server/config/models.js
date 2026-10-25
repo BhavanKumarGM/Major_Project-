@@ -20,8 +20,8 @@ export const DEFAULT_MODELS = [
     isRecommendedDefault: true
   },
   {
-    id: "gemini-2-0-flash",
-    name: "Gemini 2.0 Flash",
+    id: "gemini-2-5-flash",
+    name: "Gemini 2.5 Flash",
     provider: "Google",
     avatar: "✨",
     badgeColor: "#3b82f6",
@@ -58,6 +58,46 @@ export const DEFAULT_MODELS = [
     },
     status: "configured",
     isRecommendedDefault: true
+  },
+  {
+    id: "gpt-4o",
+    name: "GPT-4o",
+    provider: "OpenAI",
+    avatar: "🧠",
+    badgeColor: "#10a37f",
+    description: "OpenAI's multimodal flagship. Requires an OpenAI API key.",
+    contextWindow: "128k tokens",
+    latencyAvg: 900,
+    capabilities: {
+      coding: 92,
+      reasoning: 92,
+      creative: 91,
+      summarization: 93,
+      general: 93,
+      speed: 90
+    },
+    status: "configured",
+    isRecommendedDefault: false
+  },
+  {
+    id: "claude-opus-5-5",
+    name: "Claude Opus 5.5",
+    provider: "Anthropic",
+    avatar: "🎼",
+    badgeColor: "#d97706",
+    description: "Anthropic's Opus model for deep reasoning and coding. Requires an Anthropic API key.",
+    contextWindow: "1M tokens",
+    latencyAvg: 1400,
+    capabilities: {
+      coding: 97,
+      reasoning: 97,
+      creative: 94,
+      summarization: 95,
+      general: 96,
+      speed: 80
+    },
+    status: "configured",
+    isRecommendedDefault: false
   },
   {
     id: "ollama-local",

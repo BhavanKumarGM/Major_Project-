@@ -16,13 +16,25 @@ import { memoryService } from './services/memoryService.js';
 import { parseDocument } from './services/documentService.js';
 import { synthesizeResponses } from './services/synthesisService.js';
 import { BenchmarkRankerService } from './services/benchmarkRankerService.js';
+import { loadState, saveState } from './services/persistenceService.js';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5050;
+const HOST = process.env.HOST || '127.0.0.1';
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || `http://localhost:${process.env.VITE_PORT || 3045},http://127.0.0.1:${process.env.VITE_PORT || 3045}`)
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
 
-app.use(cors());
+// Same-origin requests (via the Vite proxy) carry no Origin header and are always allowed
+app.use(cors({
+  origin(origin, callback) {
+    callback(null, !origin || ALLOWED_ORIGINS.includes(origin));
+  }
+}));
 app.use(express.json({ limit: '10mb' }));
 
 const upload = multer({
@@ -30,19 +42,32 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB
 });
 
-// In-Memory state
-let configuredModels = JSON.parse(JSON.stringify(DEFAULT_MODELS));
-let criticWeights = { ...DEFAULT_CRITIC_WEIGHTS };
+// Persisted state (server/data/*.json); keys entered in the UI override .env values
+const savedSettings = loadState('settings', {});
+const savedKeys = loadState('keys', {});
+let configuredModels = Array.isArray(savedSettings.models) ? savedSettings.models : JSON.parse(JSON.stringify(DEFAULT_MODELS));
+let criticWeights = { ...DEFAULT_CRITIC_WEIGHTS, ...(savedSettings.criticWeights || {}) };
 const apiKeys = {
   sarvam: process.env.SARVAM_API_KEY || '',
   openai: process.env.OPENAI_API_KEY || '',
   gemini: process.env.GEMINI_API_KEY || '',
   anthropic: process.env.ANTHROPIC_API_KEY || '',
   groq: process.env.GROQ_API_KEY || '',
-  ollamaUrl: process.env.OLLAMA_URL || 'http://127.0.0.1:11434'
+  ollamaUrl: process.env.OLLAMA_URL || '',
+  ...savedKeys
 };
 
 const llmService = new LLMService(apiKeys);
+
+function persistSettings() {
+  saveState('settings', { models: configuredModels, criticWeights });
+}
+
+// Settings endpoints can change keys and models; protect them when ADMIN_TOKEN is set
+function requireAdmin(req, res, next) {
+  if (!ADMIN_TOKEN || req.get('x-admin-token') === ADMIN_TOKEN) return next();
+  res.status(401).json({ error: 'Admin token required. Set it in Settings to change configuration.' });
+}
 
 // --- Model Management & Settings ---
 
@@ -53,7 +78,7 @@ app.get('/api/models', (req, res) => {
   });
 });
 
-app.post('/api/models/update', (req, res) => {
+app.post('/api/models/update', requireAdmin, (req, res) => {
   const { models, weights } = req.body;
   if (models && Array.isArray(models)) {
     configuredModels = models;
@@ -61,6 +86,7 @@ app.post('/api/models/update', (req, res) => {
   if (weights) {
     criticWeights = { ...criticWeights, ...weights };
   }
+  persistSettings();
   res.json({ success: true, models: configuredModels, criticWeights });
 });
 
@@ -77,21 +103,24 @@ app.get('/api/settings/keys/status', (req, res) => {
     gemini: !!apiKeys.gemini,
     anthropic: !!apiKeys.anthropic,
     groq: !!apiKeys.groq,
-    ollamaUrl: apiKeys.ollamaUrl || 'http://127.0.0.1:11434'
+    ollamaUrl: apiKeys.ollamaUrl || 'http://127.0.0.1:11434',
+    adminTokenRequired: Boolean(ADMIN_TOKEN)
   });
 });
 
-app.post('/api/settings/keys', (req, res) => {
-  const { sarvam, openai, gemini, anthropic, groq, ollamaUrl } = req.body;
-  if (sarvam !== undefined) apiKeys.sarvam = sarvam;
-  if (openai !== undefined) apiKeys.openai = openai;
-  if (gemini !== undefined) apiKeys.gemini = gemini;
-  if (anthropic !== undefined) apiKeys.anthropic = anthropic;
-  if (groq !== undefined) apiKeys.groq = groq;
-  if (ollamaUrl !== undefined) apiKeys.ollamaUrl = ollamaUrl;
+app.post('/api/settings/keys', requireAdmin, (req, res) => {
+  const fields = ['sarvam', 'openai', 'gemini', 'anthropic', 'groq', 'ollamaUrl'];
+  // Blank inputs mean "unchanged" so saving the form never wipes keys loaded from .env
+  for (const field of fields) {
+    if (typeof req.body[field] === 'string' && req.body[field].trim()) {
+      apiKeys[field] = req.body[field].trim();
+      savedKeys[field] = apiKeys[field];
+    }
+  }
 
   llmService.updateKeys(apiKeys);
-  res.json({ success: true, message: 'API keys updated securely in server memory.' });
+  saveState('keys', savedKeys);
+  res.json({ success: true, message: 'API keys saved on the server (server/data/keys.json).' });
 });
 
 // --- Core Workflow Pipelines ---
@@ -124,7 +153,7 @@ app.post('/api/recommend-models', (req, res) => {
   try {
     const { prompt, analysis } = req.body;
     const promptAnalysis = analysis || analyzePrompt(prompt);
-    const recommendations = recommendModels(configuredModels, promptAnalysis);
+    const recommendations = recommendModels(configuredModels, promptAnalysis, id => llmService.hasCredentials(id));
     res.json(recommendations);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -137,7 +166,7 @@ app.post('/api/preflight-prompt', (req, res) => {
     const { prompt } = req.body;
     const analysis = analyzePrompt(prompt);
     const refinement = refinePrompt(prompt, analysis);
-    const recommendations = recommendModels(configuredModels, analysis);
+    const recommendations = recommendModels(configuredModels, analysis, id => llmService.hasCredentials(id));
 
     res.json({
       analysis,
@@ -162,7 +191,7 @@ app.post('/api/benchmark-ranker', (req, res) => {
 
 app.get('/api/benchmark-categories', (req, res) => {
   try {
-    const categories = BenchmarkRankerService.getAllCategories();
+    const categories = BenchmarkRankerService.getAllCategories(configuredModels);
     res.json({ categories });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -265,12 +294,12 @@ app.post('/api/synthesize', (req, res) => {
 
 // --- Document Processing ---
 
-app.post('/api/upload', upload.single('file'), (req, res) => {
+app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
-    const parsed = parseDocument(req.file.buffer, req.file.mimetype, req.file.originalname);
+    const parsed = await parseDocument(req.file.buffer, req.file.mimetype, req.file.originalname);
     res.json(parsed);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -335,6 +364,6 @@ app.get('/api/stats', (req, res) => {
   res.json(memoryService.getAnalytics());
 });
 
-app.listen(PORT, () => {
-  console.log(`[AI Hive Mind Server] Listening on http://localhost:${PORT}`);
+app.listen(PORT, HOST, () => {
+  console.log(`[AI Hive Mind Server] Listening on http://${HOST}:${PORT}`);
 });

@@ -19,9 +19,9 @@ graph TD
     Rec --> Dispatch[2. Parallel Model Dispatch]
 
     subgraph Multi-Model Arena
-        Dispatch --> OpenAI[OpenAI GPT-4o / mini]
-        Dispatch --> Anthropic[Anthropic Claude 3.5 Sonnet]
-        Dispatch --> Gemini[Google Gemini 2.0 Flash]
+        Dispatch --> OpenAI[OpenAI GPT-4o]
+        Dispatch --> Anthropic[Anthropic Claude Opus 5.5]
+        Dispatch --> Gemini[Google Gemini 2.5 Flash]
         Dispatch --> Groq[Groq Llama 3.3 70B]
         Dispatch --> Ollama[Local Ollama]
         Dispatch --> Sarvam[Sarvam AI]

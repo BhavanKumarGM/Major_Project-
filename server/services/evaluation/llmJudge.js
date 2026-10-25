@@ -5,7 +5,7 @@
  */
 
 export class LLMJudge {
-  constructor({ llmService = null, defaultJudgeModel = 'gemini-2-0-flash', enabled = false } = {}) {
+  constructor({ llmService = null, defaultJudgeModel = 'gemini-2-5-flash', enabled = false } = {}) {
     this.llmService = llmService;
     this.defaultJudgeModel = defaultJudgeModel;
     this.enabled = enabled;

@@ -1,18 +1,34 @@
 /**
  * Document Processing Service for AI Hive Mind
- * Extracts clean text from PDF, DOCX, and TXT files, and creates context chunks.
+ * Extracts clean text from PDF, DOCX, and plain-text files, and creates context chunks.
  */
 
-export function parseDocument(fileBuffer, mimeType, originalName) {
-  try {
-    let text = '';
-    const ext = originalName.split('.').pop().toLowerCase();
+// Import the library entry directly: pdf-parse's index runs a debug self-test on import
+import pdfParse from 'pdf-parse/lib/pdf-parse.js';
+import mammoth from 'mammoth';
 
-    if (ext === 'txt' || mimeType === 'text/plain' || mimeType === 'text/markdown') {
+const TEXT_EXTENSIONS = ['txt', 'md', 'markdown', 'json', 'csv', 'log'];
+
+export async function parseDocument(fileBuffer, mimeType, originalName) {
+  try {
+    const ext = originalName.includes('.') ? originalName.split('.').pop().toLowerCase() : '';
+    let text = '';
+
+    if (ext === 'pdf' || mimeType === 'application/pdf') {
+      const result = await pdfParse(fileBuffer);
+      text = result.text;
+    } else if (ext === 'docx' || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      const result = await mammoth.extractRawText({ buffer: fileBuffer });
+      text = result.value;
+    } else if (TEXT_EXTENSIONS.includes(ext) || (mimeType || '').startsWith('text/')) {
       text = fileBuffer.toString('utf-8');
     } else {
-      // Basic text extraction for raw documents/markdown/code
-      text = fileBuffer.toString('utf-8').replace(/[^\x20-\x7E\n\r\t]/g, ' ');
+      throw new Error(`Unsupported file type ".${ext || 'unknown'}". Upload PDF, DOCX, TXT, MD or JSON.`);
+    }
+
+    text = text.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    if (!text) {
+      throw new Error('No extractable text found (scanned PDFs need OCR first).');
     }
 
     // Chunking
@@ -22,7 +38,7 @@ export function parseDocument(fileBuffer, mimeType, originalName) {
       filename: originalName,
       fileType: ext,
       charCount: text.length,
-      wordCount: text.split(/\s+/).length,
+      wordCount: text.split(/\s+/).filter(Boolean).length,
       chunksCount: chunks.length,
       preview: text.substring(0, 300) + (text.length > 300 ? '...' : ''),
       fullText: text

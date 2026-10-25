@@ -41,7 +41,7 @@ export default function LegalAnalyzer({ onSendToWorkspace }) {
             recommendation: 'Require 30 days written notice with guaranteed data export window.'
           }
         ],
-        modelConsensus: 'GPT-4o, Claude 3.5 Sonnet, and Gemini consensus agree this agreement presents unacceptable exposure.'
+        modelConsensus: 'GPT-4o, Claude Opus 5.5, and Gemini consensus agree this agreement presents unacceptable exposure.'
       });
     } catch (err) {
       alert('Analysis failed: ' + err.message);

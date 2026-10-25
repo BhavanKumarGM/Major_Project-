@@ -123,8 +123,8 @@ export default function LandingPage({ onStartWorkspace, onSelectSamplePrompt }) 
               </div>
               <div className="model-pill-stack">
                 <div className="model-chip"><span className="dot" style={{background: '#10a37f'}}></span> GPT-4o</div>
-                <div className="model-chip"><span className="dot" style={{background: '#d97706'}}></span> Claude 3.5 Sonnet</div>
-                <div className="model-chip"><span className="dot" style={{background: '#3b82f6'}}></span> Gemini 2.0</div>
+                <div className="model-chip"><span className="dot" style={{background: '#d97706'}}></span> Claude Opus 5.5</div>
+                <div className="model-chip"><span className="dot" style={{background: '#3b82f6'}}></span> Gemini 2.5</div>
               </div>
             </div>
 

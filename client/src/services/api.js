@@ -3,6 +3,26 @@
  */
 
 const BASE_URL = '/api';
+const ADMIN_TOKEN_KEY = 'hiveAdminToken';
+
+export function getAdminToken() {
+  try { return localStorage.getItem(ADMIN_TOKEN_KEY) || ''; } catch { return ''; }
+}
+
+export function setAdminToken(token) {
+  try {
+    if (token) localStorage.setItem(ADMIN_TOKEN_KEY, token);
+    else localStorage.removeItem(ADMIN_TOKEN_KEY);
+  } catch { /* storage unavailable */ }
+}
+
+// Settings endpoints require the server's ADMIN_TOKEN when one is configured
+function adminHeaders() {
+  const token = getAdminToken();
+  return token
+    ? { 'Content-Type': 'application/json', 'x-admin-token': token }
+    : { 'Content-Type': 'application/json' };
+}
 
 async function handleResponse(res) {
   if (!res.ok) {
@@ -22,7 +42,7 @@ export const api = {
   async updateModelSettings(models, weights) {
     const res = await fetch(`${BASE_URL}/models/update`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: adminHeaders(),
       body: JSON.stringify({ models, weights })
     });
     return handleResponse(res);
@@ -45,7 +65,7 @@ export const api = {
   async updateKeys(keys) {
     const res = await fetch(`${BASE_URL}/settings/keys`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: adminHeaders(),
       body: JSON.stringify(keys)
     });
     return handleResponse(res);

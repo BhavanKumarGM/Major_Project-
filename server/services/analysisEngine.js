@@ -23,17 +23,18 @@ export function analyzePrompt(rawPrompt) {
 
   // 1. Detect Technologies / Languages
   const techKeywords = {
-    'C': [/\bc\b/i, /\bc program\b/i, /\bc language\b/i, /#include\s*</i],
-    'C++': [/\bc\+\+\b/i, /\bcpp\b/i, /#include\s*<iostream>/i, /\bstd::/i],
-    'Python': [/\bpython\b/i, /\bpy\b/i, /\bdef \b/i, /\bimport (numpy|pandas|math|sys)\b/i],
-    'JavaScript': [/\bjavascript\b/i, /\bjs\b/i, /\bnode\.js\b/i, /\bfunction\b/i, /\bconst |let |var \b/i],
-    'TypeScript': [/\btypescript\b/i, /\bts\b/i, /\binterface \b/i, /\btype \w+ =/i],
-    'Java': [/\bjava\b/i, /\bpublic class\b/i, /\bSystem\.out\.print/i],
-    'Rust': [/\brust\b/i, /\bfn main\b/i, /\bcargo\b/i],
-    'Go': [/\bgolang\b/i, /\bgo\b/i, /\bpackage main\b/i],
-    'SQL': [/\bsql\b/i, /\bselect \b/i, /\bfrom \b/i, /\bjoin \b/i, /\bpostgres|mysql|sqlite\b/i],
-    'HTML/CSS': [/\bhtml\b/i, /\bcss\b/i, /\btailwind\b/i, /\bfrontend\b/i],
-    'React': [/\breact\b/i, /\bhooks\b/i, /\buseState|useEffect\b/i]
+    // Patterns need language context: bare words like "c", "go", "from" or "function" are common English
+    'C': [/\b(in|using|with|write a|a) c\b(?![+#])/i, /\bc (program|programming|language|code)\b/i, /\bansi c\b/i, /#include\s*<(stdio|stdlib|string)\.h>/i],
+    'C++': [/(^|[^\w])c\+\+(?![\w+])/i, /\bcpp\b/i, /#include\s*<iostream>/i, /\bstd::/i],
+    'Python': [/\bpython\d?\b/i, /\bdef \w+\(/, /\bimport (numpy|pandas|math|sys|os)\b/i],
+    'JavaScript': [/\bjavascript\b/i, /\bjs\b/i, /\bnode\.?js\b/i, /\bconsole\.log\b/, /\b(const|let|var) \w+ =/],
+    'TypeScript': [/\btypescript\b/i, /\.tsx?\b/i, /\binterface \w+ \{/, /\btype \w+ =/],
+    'Java': [/\bjava\b(?!script)/i, /\bpublic class\b/, /\bSystem\.out\.print/],
+    'Rust': [/\brust(lang)?\b(?! (stain|remover))/i, /\bfn main\b/, /\bcargo (build|run|new)\b/i],
+    'Go': [/\bgolang\b/i, /\b(in|using|with) go\b(?! (to|for|ahead|back|through|on|over|out|into)\b)/i, /\bgo (program|code|language|module|routine)s?\b/i, /\bpackage main\b/],
+    'SQL': [/\bsql\b/i, /\bselect\s+[\w*,\s]+\s+from\s+\w+/i, /\b(inner|left|right|outer) join\b/i, /\b(postgres(ql)?|mysql|sqlite)\b/i],
+    'HTML/CSS': [/\bhtml5?\b/i, /\bcss3?\b/i, /\btailwind\b/i],
+    'React': [/\breact(\.js|js)?\b/i, /\buse(State|Effect|Memo|Ref|Context)\b/]
   };
 
   const detectedTechnologies = [];
@@ -56,7 +57,8 @@ export function analyzePrompt(rawPrompt) {
 
   // Coding signals
   if (detectedTechnologies.length > 0) categories['Coding'] += 45;
-  if (/\b(write|create|build|implement|code|program|script|debug|fix|function|algorithm|class|api|regex|prime)\b/i.test(lower)) {
+  // Generic verbs (write/create/build) and words like "script" or "class" also fit essays and stories
+  if (/\b(implement|code|coding|program|debug|refactor|compile|function|algorithm|api|regex|prime)\b/i.test(lower)) {
     categories['Coding'] += 40;
   }
   if (/\b(explain the logic|commented|optimize|time complexity|space complexity|recursion|loop|pointer)\b/i.test(lower)) {
@@ -155,7 +157,7 @@ export function analyzePrompt(rawPrompt) {
   let ambiguityLevel = 'Low';
 
   if (categories['Coding'] > 40) {
-    if (detectedTechnologies.length === 0 && !/\b(language|c|python|js|java|rust|go|cpp)\b/i.test(lower)) {
+    if (detectedTechnologies.length === 0 && !/\blanguage\b/i.test(lower)) {
       missingInfo.push('Target programming language not explicitly mentioned (defaulting to standard conventions).');
       ambiguityLevel = 'Medium';
     }

@@ -4,7 +4,7 @@
  * and outputs transparent, explainable recommendations.
  */
 
-export function recommendModels(models, analysis) {
+export function recommendModels(models, analysis, isAvailable = () => true) {
   const intentWeights = {};
   
   // Default mapping of prompt categories to capability profile keys
@@ -52,7 +52,7 @@ export function recommendModels(models, analysis) {
     const isCoding = analysis.primaryCategory === 'Coding';
     const isReasoning = analysis.primaryCategory === 'Reasoning & Logic';
 
-    if (model.id === 'claude-3-5-sonnet') {
+    if (model.id === 'claude-opus-5-5') {
       rationale = isCoding 
         ? 'Unmatched precision in syntax formatting, edge-case coverage, and clean algorithmic structure.'
         : 'Nuanced reasoning depth, structured explanations, and natural articulate prose.';
@@ -60,7 +60,7 @@ export function recommendModels(models, analysis) {
       rationale = isCoding
         ? 'High-speed code synthesis, strong logic verification, and balanced commentary.'
         : 'Versatile multi-domain knowledge with consistent instruction adherence and speed.';
-    } else if (model.id === 'gemini-2-0-flash') {
+    } else if (model.id === 'gemini-2-5-flash') {
       rationale = 'Ultra-low latency inference, large context handling, and rapid code generation.';
     } else if (model.id === 'llama-3-3-70b') {
       rationale = 'Fast execution with strong open-weight logic and efficient step-by-step reasoning.';
@@ -74,12 +74,13 @@ export function recommendModels(models, analysis) {
       ...model,
       recommendationScore: finalScore,
       recommendationRationale: rationale,
-      isTopPick: false
+      isTopPick: false,
+      isAvailable: Boolean(isAvailable(model.id))
     };
   });
 
-  // Sort descending by score
-  scoredModels.sort((a, b) => b.recommendationScore - a.recommendationScore);
+  // Models that can answer live come first, then by descending score
+  scoredModels.sort((a, b) => (b.isAvailable - a.isAvailable) || (b.recommendationScore - a.recommendationScore));
 
   if (scoredModels.length > 0) {
     scoredModels[0].isTopPick = true;

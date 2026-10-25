@@ -4,6 +4,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
+import { loadState, saveState } from './persistenceService.js';
 
 class MemoryService {
   constructor() {
@@ -26,6 +27,23 @@ class MemoryService {
       userAgreementsWithCritic: 0,
       totalUserBranchDecisions: 0
     };
+    this.load();
+  }
+
+  load() {
+    const saved = loadState('memory', null);
+    if (!saved) return;
+    for (const conv of saved.conversations || []) {
+      this.conversations.set(conv.id, conv);
+    }
+    this.analytics = { ...this.analytics, ...(saved.analytics || {}) };
+  }
+
+  persist() {
+    saveState('memory', {
+      conversations: Array.from(this.conversations.values()),
+      analytics: this.analytics
+    });
   }
 
   createConversation(initialTitle = 'New Hive Mind Chat') {
@@ -38,6 +56,7 @@ class MemoryService {
       turns: [] // Array of Turn objects
     };
     this.conversations.set(id, conv);
+    this.persist();
     return conv;
   }
 
@@ -63,13 +82,16 @@ class MemoryService {
     if (conv) {
       conv.title = newTitle;
       conv.updatedAt = new Date().toISOString();
+      this.persist();
       return true;
     }
     return false;
   }
 
   deleteConversation(id) {
-    return this.conversations.delete(id);
+    const deleted = this.conversations.delete(id);
+    if (deleted) this.persist();
+    return deleted;
   }
 
   /**
@@ -116,6 +138,7 @@ class MemoryService {
 
     // Track analytics
     this.recordAnalytics(turn);
+    this.persist();
 
     return turn;
   }
@@ -143,6 +166,7 @@ class MemoryService {
         }
       }
 
+      this.persist();
       return turn;
     }
     return null;
@@ -160,6 +184,7 @@ class MemoryService {
       turn.synthesis = synthesisResponse;
       turn.selectedModelId = 'synthesis';
       conv.updatedAt = new Date().toISOString();
+      this.persist();
       return turn;
     }
     return null;

@@ -1,9 +1,11 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
 import { spawn } from 'child_process';
+import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
-const BASE_URL = 'http://localhost:5050/api';
+const BASE_URL = 'http://127.0.0.1:5050/api';
 let serverProcess = null;
 
 describe('AI Hive Mind — Comprehensive Backend API Test Suite', () => {
@@ -17,7 +19,7 @@ describe('AI Hive Mind — Comprehensive Backend API Test Suite', () => {
     }
 
     serverProcess = spawn(process.execPath, [path.resolve(process.cwd(), 'server.js')], {
-      env: { ...process.env, PORT: '5050' },
+      env: { ...process.env, PORT: '5050', DATA_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'hive-test-')) },
       stdio: 'inherit'
     });
 
@@ -68,7 +70,7 @@ describe('AI Hive Mind — Comprehensive Backend API Test Suite', () => {
     const res = await fetch(`${BASE_URL}/models/test`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ modelId: 'gemini-2-0-flash' })
+      body: JSON.stringify({ modelId: 'gemini-2-5-flash' })
     });
     assert.strictEqual(res.status, 200);
     const data = await res.json();
@@ -180,7 +182,7 @@ describe('AI Hive Mind — Comprehensive Backend API Test Suite', () => {
     const noPrompt = await fetch(`${BASE_URL}/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ modelIds: ['gemini-2-0-flash'] })
+      body: JSON.stringify({ modelIds: ['gemini-2-5-flash'] })
     });
     assert.strictEqual(noPrompt.status, 400);
 
@@ -205,7 +207,7 @@ describe('AI Hive Mind — Comprehensive Backend API Test Suite', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         prompt: 'Say hello in 5 words or less.',
-        modelIds: ['gemini-2-0-flash', 'llama-3-3-70b']
+        modelIds: ['gemini-2-5-flash', 'llama-3-3-70b']
       })
     });
     assert.strictEqual(res.status, 200);
@@ -222,8 +224,8 @@ describe('AI Hive Mind — Comprehensive Backend API Test Suite', () => {
   it('POST /api/critic-evaluate evaluates candidate responses and returns rich diagnostics', async () => {
     const candidateResponses = [
       {
-        modelId: 'gemini-2-0-flash',
-        modelName: 'Gemini 2.0 Flash',
+        modelId: 'gemini-2-5-flash',
+        modelName: 'Gemini 2.5 Flash',
         provider: 'Google',
         text: '```python\ndef is_prime(n):\n    if n <= 1: return False\n    return True\n```'
       },
@@ -270,8 +272,8 @@ describe('AI Hive Mind — Comprehensive Backend API Test Suite', () => {
   it('POST /api/synthesize merges responses and independently evaluates consensus', async () => {
     const candidateResponses = [
       {
-        modelId: 'gemini-2-0-flash',
-        modelName: 'Gemini 2.0 Flash',
+        modelId: 'gemini-2-5-flash',
+        modelName: 'Gemini 2.5 Flash',
         text: 'Solution part 1'
       },
       {
@@ -372,10 +374,10 @@ describe('AI Hive Mind — Comprehensive Backend API Test Suite', () => {
       body: JSON.stringify({
         userPrompt: 'Tell me a joke',
         responses: [
-          { modelId: 'gemini-2-0-flash', text: 'Why do programmers prefer dark mode? Because light attracts bugs.' },
+          { modelId: 'gemini-2-5-flash', text: 'Why do programmers prefer dark mode? Because light attracts bugs.' },
           { modelId: 'llama-3-3-70b', text: 'There are 10 types of people: those who understand binary and those who do not.' }
         ],
-        selectedModelId: 'gemini-2-0-flash'
+        selectedModelId: 'gemini-2-5-flash'
       })
     });
     assert.strictEqual(res.status, 200);

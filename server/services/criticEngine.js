@@ -32,7 +32,7 @@ export async function evaluateResponses(
   if (extraContext.llmService && options.enableLLMJudge) {
     judge = new LLMJudge({
       llmService: extraContext.llmService,
-      defaultJudgeModel: options.judgeModel || 'gemini-2-0-flash',
+      defaultJudgeModel: options.judgeModel || 'gemini-2-5-flash',
       enabled: true
     });
   }

@@ -8,6 +8,14 @@
 
 import { BENCHMARK_CATEGORIES, MODEL_BENCHMARKS } from '../config/benchmarks.js';
 
+// Benchmark profiles limited to the models currently configured (all profiles when none given)
+function profilesFor(models) {
+  const entries = Object.entries(MODEL_BENCHMARKS);
+  if (!Array.isArray(models)) return entries;
+  const ids = new Set(models.map(m => m.id));
+  return entries.filter(([id]) => ids.has(id));
+}
+
 export class BenchmarkRankerService {
   /**
    * Classify prompt into categories with confidence scores
@@ -146,7 +154,7 @@ export class BenchmarkRankerService {
     const catConfig = BENCHMARK_CATEGORIES[primaryCat];
 
     // Compute composite benchmark score for each model
-    const scoredList = Object.entries(MODEL_BENCHMARKS).map(([modelId, data]) => {
+    const scoredList = profilesFor(models).map(([modelId, data]) => {
       let weightedSum = 0;
       let totalWeight = 0;
 
@@ -218,12 +226,22 @@ export class BenchmarkRankerService {
       item.isWinner = index === 0;
     });
 
-    const winner = scoredList[0];
-    const runnerUp = scoredList[1];
+    const winner = scoredList[0] || null;
+    const runnerUp = scoredList[1] || null;
+
+    // Configured models with no benchmark profile are reported, not scored
+    const unrankedModels = (Array.isArray(models) ? models : [])
+      .filter(m => !MODEL_BENCHMARKS[m.id])
+      .map(m => ({ modelId: m.id, name: m.name, provider: m.provider, reason: 'No benchmark data recorded for this model.' }));
 
     // Formulate transparent explanation
-    const rationale = `${winner.name} ranks #1 for ${catConfig.name} with a composite benchmark score of ${winner.compositeScore}/100. ` +
-      `${winner.keyStrength} It outperforms runner-up ${runnerUp?.name} (${runnerUp?.compositeScore}/100) on the ${catConfig.primaryBenchmarks[0]?.name} benchmark.`;
+    let rationale = 'No configured model has benchmark data for this category.';
+    if (winner) {
+      rationale = `${winner.name} ranks #1 for ${catConfig.name} with a composite benchmark score of ${winner.compositeScore}/100. ${winner.keyStrength}`;
+      if (runnerUp) {
+        rationale += ` It outperforms runner-up ${runnerUp.name} (${runnerUp.compositeScore}/100) on the ${catConfig.primaryBenchmarks[0]?.name} benchmark.`;
+      }
+    }
 
     return {
       prompt: rawPrompt,
@@ -235,6 +253,7 @@ export class BenchmarkRankerService {
       topRankedModel: winner,
       runnerUpModel: runnerUp,
       rankedModels: scoredList,
+      unrankedModels,
       verdictRationale: rationale
     };
   }
@@ -242,10 +261,10 @@ export class BenchmarkRankerService {
   /**
    * Get all benchmark categories and leaderboards
    */
-  static getAllCategories() {
+  static getAllCategories(models = null) {
     return Object.values(BENCHMARK_CATEGORIES).map(cat => {
       // Find top model for this category
-      const topModelEntry = Object.entries(MODEL_BENCHMARKS).map(([id, d]) => {
+      const topModelEntry = profilesFor(models).map(([id, d]) => {
         let sum = 0;
         cat.primaryBenchmarks.forEach(bm => {
           let v = d.scores[bm.id];
@@ -254,7 +273,7 @@ export class BenchmarkRankerService {
           sum += v * bm.weight;
         });
         return { id, name: d.name, score: Math.round(sum * 10) / 10, badge: d.standoutBadge };
-      }).sort((a, b) => b.score - a.score)[0];
+      }).sort((a, b) => b.score - a.score)[0] || null;
 
       return {
         ...cat,

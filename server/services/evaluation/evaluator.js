@@ -170,6 +170,22 @@ export async function runEvidenceEvaluation({
       }
     }
 
+    // Simulated (non-live) output is not real model evidence
+    const isSimulated = resp.isSimulated === true;
+    if (isSimulated) {
+      const issue = createDiagnosticIssue({
+        modelId,
+        category: 'provider_error',
+        severity: 'high',
+        description: 'Response was produced by the offline simulation engine, not by the live model.',
+        evidence: 'isSimulated=true',
+        likelySource: 'provider_or_execution',
+        recommendedCorrection: 'Configure an API key for this provider to get a real response.'
+      });
+      candidateIssues.push(issue);
+      allIssues.push(issue);
+    }
+
     // From judge findings (if any)
     for (const jf of judgeResult.diagnosticIssues || []) {
       const issue = createDiagnosticIssue({
@@ -305,6 +321,7 @@ export async function runEvidenceEvaluation({
       avatar,
       badgeColor,
       isEligible,
+      isSimulated,
       status: candidateStatus,
       scores: {
         correctness,
@@ -327,9 +344,10 @@ export async function runEvidenceEvaluation({
   }
 
   // 3. Winner Determination (Section 12)
-  // Only eligible candidates are considered
+  // Only eligible candidates are considered; simulated output never beats a live response
+  const hasLiveEligible = candidateEvaluations.some(c => c.isEligible && !c.isSimulated);
   const eligibleCandidates = candidateEvaluations
-    .filter(c => c.isEligible)
+    .filter(c => c.isEligible && (!hasLiveEligible || !c.isSimulated))
     .sort((a, b) => b.scores.overall - a.scores.overall);
 
   let winner = null;

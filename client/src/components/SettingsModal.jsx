@@ -14,7 +14,7 @@ import {
   ShieldCheck,
   Server
 } from 'lucide-react';
-import { api } from '../services/api.js';
+import { api, getAdminToken, setAdminToken } from '../services/api.js';
 
 export default function SettingsModal({
   isOpen,
@@ -39,6 +39,7 @@ export default function SettingsModal({
   const [localModels, setLocalModels] = useState(models || []);
   const [localWeights, setLocalWeights] = useState(criticWeights || {});
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [adminToken, setAdminTokenInput] = useState(getAdminToken());
 
   useEffect(() => {
     if (isOpen) {
@@ -68,6 +69,7 @@ export default function SettingsModal({
   };
 
   const handleSaveKeys = async () => {
+    setAdminToken(adminToken.trim());
     try {
       await api.updateKeys(keyInputs);
       const status = await api.getKeyStatus();
@@ -103,9 +105,14 @@ export default function SettingsModal({
 
   const handleSaveAll = async () => {
     await handleSaveKeys();
+    try {
+      await api.updateModelSettings(localModels, localWeights);
+    } catch (err) {
+      alert('Error saving settings: ' + err.message);
+      return;
+    }
     onSaveModels(localModels);
     onSaveCriticWeights(localWeights);
-    await api.updateModelSettings(localModels, localWeights);
     onClose();
   };
 
@@ -155,10 +162,30 @@ export default function SettingsModal({
               <div className="info-banner">
                 <ShieldCheck size={18} className="text-emerald" />
                 <p>
-                  Keys are handled exclusively on the backend server. 
-                  When an API key is absent, the platform safely runs via deterministic academic simulation.
+                  Keys are handled exclusively on the backend server and saved to server/data/keys.json.
+                  Providers without a key return clearly labelled simulated demo answers; a configured provider that fails shows an error.
                 </p>
               </div>
+
+              {keyStatus.adminTokenRequired && (
+                <div className="key-row glass-card">
+                  <div className="key-info">
+                    <div className="key-title">
+                      <span>🔒 Admin Token</span>
+                    </div>
+                    <p className="key-desc">This server requires its ADMIN_TOKEN to change keys or settings. Stored in this browser only.</p>
+                  </div>
+                  <div className="key-input-row">
+                    <input
+                      type="password"
+                      placeholder="Paste the server's ADMIN_TOKEN"
+                      className="key-input"
+                      value={adminToken}
+                      onChange={e => setAdminTokenInput(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="keys-grid">
                 {/* Sarvam AI (Indic 105B) */}
@@ -208,7 +235,7 @@ export default function SettingsModal({
                         <span className="badge badge-amber">Offline / Fallback</span>
                       )}
                     </div>
-                    <p className="key-desc">Powers Gemini 2.0 Flash / Pro models.</p>
+                    <p className="key-desc">Powers Gemini 2.5 Flash / Pro models.</p>
                   </div>
                   <div className="key-input-row">
                     <input 
@@ -220,15 +247,15 @@ export default function SettingsModal({
                     />
                     <button 
                       className="btn btn-secondary btn-xs"
-                      onClick={() => handleTestConnection('gemini-2-0-flash')}
-                      disabled={testingModelId === 'gemini-2-0-flash'}
+                      onClick={() => handleTestConnection('gemini-2-5-flash')}
+                      disabled={testingModelId === 'gemini-2-5-flash'}
                     >
-                      {testingModelId === 'gemini-2-0-flash' ? 'Testing...' : 'Test'}
+                      {testingModelId === 'gemini-2-5-flash' ? 'Testing...' : 'Test'}
                     </button>
                   </div>
-                  {testResults['gemini-2-0-flash'] && (
+                  {testResults['gemini-2-5-flash'] && (
                     <div className="test-feedback">
-                      Status: {testResults['gemini-2-0-flash'].message} ({testResults['gemini-2-0-flash'].latency}ms)
+                      Status: {testResults['gemini-2-5-flash'].message} ({testResults['gemini-2-5-flash'].latency}ms)
                     </div>
                   )}
                 </div>
@@ -280,7 +307,7 @@ export default function SettingsModal({
                         <span className="badge badge-amber">Offline / Fallback</span>
                       )}
                     </div>
-                    <p className="key-desc">Powers Claude 3.5 Sonnet.</p>
+                    <p className="key-desc">Powers Claude Opus 5.5.</p>
                   </div>
                   <div className="key-input-row">
                     <input 
@@ -292,10 +319,10 @@ export default function SettingsModal({
                     />
                     <button 
                       className="btn btn-secondary btn-xs"
-                      onClick={() => handleTestConnection('claude-3-5-sonnet')}
-                      disabled={testingModelId === 'claude-3-5-sonnet'}
+                      onClick={() => handleTestConnection('claude-opus-5-5')}
+                      disabled={testingModelId === 'claude-opus-5-5'}
                     >
-                      {testingModelId === 'claude-3-5-sonnet' ? 'Testing...' : 'Test'}
+                      {testingModelId === 'claude-opus-5-5' ? 'Testing...' : 'Test'}
                     </button>
                   </div>
                 </div>

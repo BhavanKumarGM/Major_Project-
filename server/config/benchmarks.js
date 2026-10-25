@@ -92,69 +92,13 @@ export const BENCHMARK_CATEGORIES = {
 };
 
 /**
- * Empirical Benchmark Data for all Supported Models
+ * Benchmark profiles for the models the app can run (keyed by model id in config/models.js).
+ * Scores are hand-entered reference values, not measured by this app; verify them against
+ * the published leaderboards before relying on them. The Gemini 2.5 Flash entry still
+ * carries figures recorded for Gemini 2.0 Flash. Models without a profile here (e.g.
+ * Claude Opus 5.5) are listed as unranked rather than given invented numbers.
  */
 export const MODEL_BENCHMARKS = {
-  'claude-3-5-sonnet': {
-    name: 'Claude 3.5 Sonnet',
-    provider: 'Anthropic',
-    scores: {
-      humaneval: 93.7,
-      swebench: 49.2,
-      mbpp: 91.0,
-      gsm8k: 96.4,
-      math: 78.3,
-      gpqa: 65.0,
-      indicllm: 74.5,
-      bhashaeval: 76.2,
-      flores: 88.0,
-      mmlupro: 78.0,
-      arenaelo: 1283,
-      arc: 96.7,
-      ruler: 94.5,
-      qmsum: 92.0,
-      faithfulness: 96.0,
-      mtbench: 9.3,
-      creativeelo: 1275,
-      variety: 94.0,
-      ifeval: 88.0,
-      jsonformat: 97.0,
-      negativecon: 92.0
-    },
-    standoutCategory: 'coding',
-    standoutBadge: 'SOTA Code & Nuance',
-    keyStrength: 'Highest HumanEval (93.7%) & SWE-bench (49.2%) across all models, leading in syntax and structural software engineering.'
-  },
-  'deepseek-r1': {
-    name: 'DeepSeek R1',
-    provider: 'DeepSeek',
-    scores: {
-      humaneval: 90.5,
-      swebench: 49.2,
-      mbpp: 88.5,
-      gsm8k: 97.3,
-      math: 79.8,
-      gpqa: 67.2,
-      indicllm: 71.0,
-      bhashaeval: 72.5,
-      flores: 85.0,
-      mmlupro: 84.0,
-      arenaelo: 1278,
-      arc: 97.1,
-      ruler: 91.0,
-      qmsum: 87.0,
-      faithfulness: 94.0,
-      mtbench: 8.5,
-      creativeelo: 1220,
-      variety: 88.0,
-      ifeval: 82.5,
-      jsonformat: 91.0,
-      negativecon: 87.0
-    },
-    standoutCategory: 'reasoning',
-    standoutBadge: 'SOTA Math & Logic',
-    keyStrength: 'Highest MATH score (79.8%) and GSM8K (97.3%) through autonomous Reinforcement Learning chain-of-thought verification.'
-  },
   'gpt-4o': {
     name: 'GPT-4o',
     provider: 'OpenAI',
@@ -215,8 +159,8 @@ export const MODEL_BENCHMARKS = {
     standoutBadge: 'Indic Sovereign Leader',
     keyStrength: 'Dominates IndicLLM (92.4%) and BhashaEval (94.1%) across 22 Indian languages with culturally grounded nuance.'
   },
-  'gemini-2-0-flash': {
-    name: 'Gemini 2.0 Flash',
+  'gemini-2-5-flash': {
+    name: 'Gemini 2.5 Flash',
     provider: 'Google',
     scores: {
       humaneval: 82.5,

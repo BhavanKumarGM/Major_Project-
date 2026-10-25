@@ -1,7 +1,8 @@
 /**
  * Multi-LLM Service Orchestrator for AI Hive Mind
  * Dispatches prompts to real API providers (OpenAI, Gemini, Claude, Groq, Ollama)
- * or provides high-fidelity fallback generation with telemetry and graceful error handling.
+ * Providers without credentials fall back to a clearly flagged demo simulation;
+ * configured providers that fail report an error instead of fake output.
  */
 
 export class LLMService {
@@ -43,14 +44,16 @@ export class LLMService {
         return { status: 'connected', latency: Date.now() - startTime, message: 'Connected to OpenAI' };
       }
 
-      if (modelId === 'gemini-2-0-flash') {
+      if (modelId === 'gemini-2-5-flash') {
         if (!this.apiKeys.gemini) return { status: 'unconfigured', message: 'Gemini API key not configured' };
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${this.apiKeys.gemini}`);
+        const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
+          headers: { 'x-goog-api-key': this.apiKeys.gemini }
+        });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return { status: 'connected', latency: Date.now() - startTime, message: 'Connected to Google Gemini' };
       }
 
-      if (modelId === 'claude-3-5-sonnet') {
+      if (modelId === 'claude-opus-5-5') {
         if (!this.apiKeys.anthropic) return { status: 'unconfigured', message: 'Anthropic API key not configured' };
         return { status: 'configured', latency: Date.now() - startTime, message: 'Key saved (ready for Anthropic calls)' };
       }
@@ -84,53 +87,82 @@ export class LLMService {
       fullPrompt = `[Referenced Document Context]:\n${documentContext}\n\n[User Instruction]:\n${prompt}`;
     }
 
-    // Try Live API if configured
-    try {
-      if (model.id === 'sarvam-105b' && this.apiKeys.sarvam) {
-        const result = await this.callSarvam(fullPrompt, conversationContext);
-        return { ...result, modelId: model.id, modelName: model.name, provider: model.provider, avatar: model.avatar, badgeColor: model.badgeColor, latency: Date.now() - startTime, isLive: true };
+    const meta = { modelId: model.id, modelName: model.name, provider: model.provider, avatar: model.avatar, badgeColor: model.badgeColor };
+    const emptyUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+
+    // A configured provider either answers live or reports its error; it never silently falls back
+    const liveCall = this.getLiveCall(model.id);
+    if (liveCall) {
+      try {
+        const result = await liveCall(fullPrompt, conversationContext);
+        return { ...result, ...meta, latency: Date.now() - startTime, isLive: true, isSimulated: false };
+      } catch (err) {
+        console.warn(`[LLMService] Live call for ${model.id} failed: ${err.message}`);
+        return {
+          ...meta,
+          status: 'error',
+          errorMessage: err.message || 'Generation failed',
+          text: `[Error from ${model.name}: ${err.message || 'API call was unable to complete.'}]`,
+          tokenUsage: emptyUsage,
+          latency: Date.now() - startTime,
+          isLive: false,
+          isSimulated: false
+        };
       }
-      if (model.id === 'gpt-4o' && this.apiKeys.openai) {
-        const result = await this.callOpenAI(fullPrompt, conversationContext);
-        return { ...result, modelId: model.id, modelName: model.name, provider: model.provider, avatar: model.avatar, badgeColor: model.badgeColor, latency: Date.now() - startTime, isLive: true };
-      }
-      if (model.id === 'gemini-2-0-flash' && this.apiKeys.gemini) {
-        const result = await this.callGemini(fullPrompt, conversationContext);
-        return { ...result, modelId: model.id, modelName: model.name, provider: model.provider, avatar: model.avatar, badgeColor: model.badgeColor, latency: Date.now() - startTime, isLive: true };
-      }
-      if (model.id === 'llama-3-3-70b' && this.apiKeys.groq) {
-        const result = await this.callGroq(fullPrompt, conversationContext);
-        return { ...result, modelId: model.id, modelName: model.name, provider: model.provider, avatar: model.avatar, badgeColor: model.badgeColor, latency: Date.now() - startTime, isLive: true };
-      }
-      if (model.id === 'claude-3-5-sonnet' && this.apiKeys.anthropic) {
-        const result = await this.callAnthropic(fullPrompt, conversationContext);
-        return { ...result, modelId: model.id, modelName: model.name, provider: model.provider, avatar: model.avatar, badgeColor: model.badgeColor, latency: Date.now() - startTime, isLive: true };
-      }
-      if (model.id === 'ollama-local') {
-        const result = await this.callOllama(fullPrompt, conversationContext);
-        return { ...result, modelId: model.id, modelName: model.name, provider: model.provider, avatar: model.avatar, badgeColor: model.badgeColor, latency: Date.now() - startTime, isLive: true };
-      }
-    } catch (err) {
-      console.warn(`[LLMService] Live call for ${model.id} failed (${err.message}). Falling back to simulation engine.`);
     }
 
-    // High-Fidelity Simulation / Academic Demo Engine
+    if (process.env.ALLOW_SIMULATION === 'false') {
+      const message = `No API key configured for ${model.provider}. Add one in Settings.`;
+      return {
+        ...meta,
+        status: 'error',
+        errorMessage: message,
+        text: `[Error from ${model.name}: ${message}]`,
+        tokenUsage: emptyUsage,
+        latency: 0,
+        isLive: false,
+        isSimulated: false
+      };
+    }
+
+    // Demo simulation for providers without credentials (flagged so the UI and critic can tell)
     const simulated = await this.simulateModelResponse(model, prompt, conversationContext);
     const latency = Math.round(model.latencyAvg * (0.8 + Math.random() * 0.4));
     await new Promise(r => setTimeout(r, Math.min(latency, 1200))); // natural async delay
 
     return {
-      modelId: model.id,
-      modelName: model.name,
-      provider: model.provider,
-      avatar: model.avatar,
-      badgeColor: model.badgeColor,
+      ...meta,
       text: simulated.text,
       tokenUsage: simulated.tokenUsage,
       latency: Date.now() - startTime,
       isLive: false,
+      isSimulated: true,
       status: 'success'
     };
+  }
+
+  /**
+   * Returns the live API call for a model, or null when its provider has no credentials.
+   */
+  getLiveCall(modelId) {
+    const k = this.apiKeys;
+    const calls = {
+      'sarvam-105b': k.sarvam && ((p, c) => this.callSarvam(p, c)),
+      'gpt-4o': k.openai && ((p, c) => this.callOpenAI(p, c)),
+      'gemini-2-5-flash': k.gemini && ((p, c) => this.callGemini(p, c)),
+      'llama-3-3-70b': k.groq && ((p, c) => this.callGroq(p, c)),
+      'claude-opus-5-5': k.anthropic && ((p, c) => this.callAnthropic(p, c)),
+      'ollama-local': (p, c) => this.callOllama(p, c)
+    };
+    return calls[modelId] || null;
+  }
+
+  /**
+   * True when a model can be answered by its real provider (Ollama counts once a URL is set).
+   */
+  hasCredentials(modelId) {
+    if (modelId === 'ollama-local') return Boolean(this.apiKeys.ollamaUrl);
+    return Boolean(this.getLiveCall(modelId));
   }
 
   async generateParallel(selectedModels, prompt, conversationContext = [], documentContext = '') {
@@ -226,7 +258,7 @@ export class LLMService {
   }
 
   async callGemini(prompt, context) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKeys.gemini}`;
+    const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
     const contents = context.map(m => ({
       role: m.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: m.text || m.content }]
@@ -235,7 +267,7 @@ export class LLMService {
 
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': this.apiKeys.gemini },
       body: JSON.stringify({ contents })
     });
 
@@ -306,11 +338,13 @@ export class LLMService {
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': this.apiKeys.anthropic,
-        'anthropic-version': '2023-06-01'
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'server-side-fallback-2026-07-01'
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 2048,
+        model: 'claude-opus-5-5',
+        max_tokens: 16000,
+        fallbacks: 'default',
         messages
       })
     });
@@ -321,8 +355,13 @@ export class LLMService {
     }
 
     const data = await res.json();
+    if (data.stop_reason === 'refusal') {
+      throw new Error(`Claude declined the request${data.stop_details?.category ? ` (${data.stop_details.category})` : ''}`);
+    }
+    // Content may start with thinking blocks; keep only the text blocks
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
     return {
-      text: data.content?.[0]?.text || '',
+      text,
       tokenUsage: {
         promptTokens: data.usage?.input_tokens || 0,
         completionTokens: data.usage?.output_tokens || 0,
@@ -371,7 +410,7 @@ export class LLMService {
 
     // 1. C Prime Program
     if (/\b(c program|c language|in c\b|#include)\b/i.test(lower) && /\bprime\b/i.test(lower)) {
-      if (model.id === 'claude-3-5-sonnet') {
+      if (model.id === 'claude-opus-5-5') {
         text = `### Prime Number Verification in C (Optimized Approach)
 
 Here is a complete, robust, and well-structured C program to check whether a given number is prime.
