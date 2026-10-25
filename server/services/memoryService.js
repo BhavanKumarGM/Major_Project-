@@ -105,7 +105,9 @@ class MemoryService {
     recommendations,
     responses, // Array of response objects from parallel models
     criticEvaluation,
-    selectedModelId // Default or chosen response
+    selectedModelId, // Default or chosen response
+    executionMode = 'multi', // 'single' (Decision Model) | 'multi'
+    decision = null // Decision Model result for single mode
   }) {
     let conv = this.conversations.get(conversationId);
     if (!conv) {
@@ -130,7 +132,9 @@ class MemoryService {
       responses,
       criticEvaluation,
       selectedModelId: defaultSelectedId,
-      synthesis: null
+      synthesis: null,
+      executionMode,
+      decision
     };
 
     conv.turns.push(turn);
@@ -153,6 +157,7 @@ class MemoryService {
     const turn = conv.turns.find(t => t.turnId === turnId);
     if (turn) {
       turn.selectedModelId = selectedModelId;
+      turn.branchChosenByUser = true;
       conv.updatedAt = new Date().toISOString();
       
       // Update analytics
@@ -206,7 +211,12 @@ class MemoryService {
         chosenText = turn.synthesis.text;
       } else {
         const resp = turn.responses.find(r => r.modelId === turn.selectedModelId) || turn.responses[0];
-        chosenText = resp ? resp.text : '';
+        // Provider error text is not an answer; leave the failed exchange out of history
+        if (!resp || resp.status === 'error') {
+          context.pop();
+          continue;
+        }
+        chosenText = resp.text;
       }
 
       if (chosenText) {
@@ -214,6 +224,32 @@ class MemoryService {
       }
     }
     return context;
+  }
+
+  /**
+   * Observed Critic performance per model for one task category, from saved turns.
+   * Only live answers count (simulated and failed responses are skipped).
+   * @returns {{ [modelId]: { avgScore: number, count: number } }}
+   */
+  getModelPerformance(category) {
+    const totals = {};
+    for (const conv of this.conversations.values()) {
+      for (const turn of conv.turns) {
+        if (!turn.criticEvaluation?.evaluations || (category && turn.analysis?.primaryCategory !== category)) continue;
+        for (const ev of turn.criticEvaluation.evaluations) {
+          const resp = turn.responses?.find(r => r.modelId === ev.modelId);
+          if (!resp || resp.isSimulated || resp.status === 'error' || typeof ev.scores?.overall !== 'number') continue;
+          const t = totals[ev.modelId] || (totals[ev.modelId] = { sum: 0, count: 0 });
+          t.sum += ev.scores.overall;
+          t.count += 1;
+        }
+      }
+    }
+    const result = {};
+    for (const [id, t] of Object.entries(totals)) {
+      result[id] = { avgScore: Math.round((t.sum / t.count) * 10) / 10, count: t.count };
+    }
+    return result;
   }
 
   recordAnalytics(turn) {

@@ -1,15 +1,99 @@
 /**
  * Prompt Refinement & Breakdown Engine for AI Hive Mind
- * Generates an improved version of the user prompt without changing intent,
- * and extracts a structured task breakdown.
+ * Fixes spelling/grammar, then adds a short list of task-appropriate requirements to the
+ * user's own wording (never wraps it in quotes or replaces it), and extracts a task breakdown.
+ * Refining an already refined prompt does not add a second requirements block.
  */
 
-export function refinePrompt(rawPrompt, analysis) {
+import { correctPrompt } from './spellingService.js';
+
+const REQUIREMENTS_HEADER = 'Requirements:';
+const ALREADY_REFINED = /\n\s*Requirements:\s*\n\s*[-\d]/i;
+
+// Constraint labels produced by analyzePrompt → requirement wording
+const CONSTRAINT_REQUIREMENTS = {
+  'Beginner-friendly simplicity & clear commentary': 'Explain in beginner-friendly terms and avoid unexplained jargon.',
+  'Optimized performance and algorithmic efficiency': 'Prefer an efficient approach and mention its performance characteristics.',
+  'Restricted to standard library only (no 3rd party dependencies)': 'Use only the standard library (no third-party dependencies).',
+  'Concise output without unnecessary fluff': 'Keep the answer concise.'
+};
+
+function categoryRequirements(category, analysis, lower) {
+  const tech = analysis.technologies?.[0] || null;
+
+  if (category === 'Coding') {
+    if (/\bprime\b/.test(lower)) {
+      return [
+        tech ? `Use ${tech}.` : 'State which programming language you use.',
+        'Handle edge cases: numbers <= 1, 2, even numbers, negative input and large integers.',
+        'Use an efficient check (test divisors only up to √n).',
+        'Explain the mathematical and algorithmic logic step by step.',
+        'Show example inputs with expected outputs (e.g. 2, 17, 25, -5).'
+      ];
+    }
+    return [
+      tech ? `Use ${tech}${analysis.technologies.length > 1 ? ` (with ${analysis.technologies.slice(1).join(', ')})` : ''}.`
+        : 'Choose a suitable programming language and say which one you used.',
+      'Provide complete, runnable code with brief comments.',
+      'Handle edge cases and invalid input.',
+      'Explain the approach, including time and space complexity where relevant.',
+      'Include a short usage example with expected output.'
+    ];
+  }
+  if (category === 'Summarization') {
+    return [
+      'Start with a one-sentence TL;DR.',
+      'List the 3-5 most important points as bullets.',
+      'Note key implications or trade-offs.',
+      'Stay faithful to the source; do not add facts that are not in it.'
+    ];
+  }
+  if (category === 'Reasoning & Logic') {
+    return [
+      'State any assumptions first.',
+      'Work through the reasoning step by step without skipping steps.',
+      'Consider alternative views or counterarguments where relevant.',
+      'End with a clear, justified conclusion.'
+    ];
+  }
+  if (category === 'Creative Writing') {
+    return [
+      'Respect any requested form, length and tone.',
+      'Use vivid, concrete detail and a consistent voice.',
+      'Give the piece a clear structure and a satisfying ending.'
+    ];
+  }
+  if (category === 'Research & Fact-finding') {
+    return [
+      'Separate established facts from estimates or opinions.',
+      'Cite sources where possible, and say clearly when you are unsure.',
+      'Mention if the information may be out of date.'
+    ];
+  }
+  if (category === 'Documentation') {
+    return [
+      `Write for a ${analysis.targetAudience?.toLowerCase().includes('beginner') ? 'beginner' : 'technical'} reader with clear headings.`,
+      'Explain step by step, with examples.',
+      'Point out common mistakes or pitfalls.'
+    ];
+  }
+  return [
+    'Answer the question directly first, then add supporting detail.',
+    'Use headings, bullet points or tables where they make the answer clearer.',
+    'Include practical examples or next steps where useful.'
+  ];
+}
+
+export function refinePrompt(rawPrompt, analysis = {}) {
   if (!rawPrompt || !rawPrompt.trim()) {
     return {
       originalPrompt: '',
+      correctedPrompt: '',
       refinedPrompt: '',
+      corrections: [],
+      flaggedWords: [],
       improvements: [],
+      refinementMethod: 'rules',
       breakdown: {
         goal: 'No input provided',
         taskType: 'General',
@@ -23,97 +107,72 @@ export function refinePrompt(rawPrompt, analysis) {
   }
 
   const prompt = rawPrompt.trim();
-  const lower = prompt.toLowerCase();
+  const { text: corrected, corrections, flagged } = correctPrompt(prompt);
+  const lower = corrected.toLowerCase();
+  const category = analysis.primaryCategory || 'General Assistance';
   const improvements = [];
-  let refined = prompt;
 
-  const isCoding = analysis.primaryCategory === 'Coding' || (analysis.technologies && analysis.technologies.length > 0);
-  const tech = analysis.technologies && analysis.technologies.length > 0 ? analysis.technologies[0] : (isCoding ? 'Python' : null);
+  const spelling = corrections.filter(c => c.type === 'spelling');
+  const other = corrections.filter(c => c.type !== 'spelling');
+  if (spelling.length > 0) {
+    improvements.push(`Fixed spelling: ${spelling.map(c => `${c.from} → ${c.to}`).join(', ')}.`);
+  }
+  if (other.length > 0) {
+    improvements.push(`Tidied grammar and casing: ${other.map(c => `${c.from} → ${c.to}`).join(', ')}.`);
+  }
+  for (const f of flagged) {
+    improvements.push(`Possible typo left unchanged: "${f.word}" (did you mean ${f.suggestions.join(' or ')}?).`);
+  }
 
-  // Prime number specific example enhancement
-  if (/\bprime\b/i.test(lower) && (isCoding || /\bprogram|code|check\b/i.test(lower))) {
-    const lang = tech || 'Python';
-    refined = `Write a clean, well-commented ${lang} program to determine whether a given integer is prime. Include:
-1. Robust edge-case handling (numbers <= 1, 2, even numbers, and large integers).
-2. An efficient algorithm (testing divisibility up to √n).
-3. A clear step-by-step explanation of the mathematical and algorithmic logic.
-4. Example inputs with their corresponding expected outputs (e.g., test with 2, 17, 25, -5).`;
-
-    improvements.push('Added explicit edge-case specifications (<= 1, 2, negative numbers).');
-    improvements.push('Specified mathematical optimization constraint (testing up to √n for O(√n) efficiency).');
-    improvements.push('Requested structured code commentary and logic breakdown.');
-    improvements.push('Added sample test cases for verification.');
-  } else if (isCoding) {
-    // General coding refinement
-    const parts = [];
-    parts.push(`Implement a complete, production-ready ${tech || 'programming'} solution for the following request: "${prompt}".`);
-    parts.push(`Requirements:`);
-    parts.push(`1. Provide clean, idiomatic code with thorough inline comments.`);
-    parts.push(`2. Handle common boundary conditions and potential edge cases gracefully.`);
-    parts.push(`3. Briefly explain the algorithmic approach, time complexity, and space complexity.`);
-    parts.push(`4. Include a working usage example with sample input and expected output.`);
-
-    refined = parts.join('\n');
-    improvements.push('Enriched with edge-case handling and boundary validation.');
-    improvements.push('Explicitly requested time and space complexity annotations.');
-    improvements.push('Requested runnable usage examples.');
-  } else if (analysis.primaryCategory === 'Summarization') {
-    refined = `Provide an insightful and structured executive summary of the following topic: "${prompt}".
-Key requirements:
-- Highlight the core thesis and 3-5 pivotal points with concise bullet points.
-- Identify key implications, trade-offs, and takeaways.
-- Conclude with a 1-sentence TL;DR summary.`;
-    improvements.push('Structured output into bulleted highlights and executive takeaways.');
-    improvements.push('Added requirement for a concise TL;DR conclusion.');
-  } else if (analysis.primaryCategory === 'Reasoning & Logic') {
-    refined = `Provide a rigorous, step-by-step analysis and solution for: "${prompt}".
-Please ensure:
-1. Clearly state foundational principles and any underlying assumptions.
-2. Walk through the logical deduction sequentially without skipping intermediate steps.
-3. Compare potential alternative perspectives or counterarguments.
-4. Provide a definitive, well-justified final conclusion.`;
-    improvements.push('Added structured step-by-step logical decomposition.');
-    improvements.push('Required explicit statement of assumptions and counterarguments.');
-  } else if (analysis.primaryCategory === 'Creative Writing') {
-    refined = `Craft a compelling and evocative piece based on: "${prompt}".
-Guidelines:
-- Establish a distinct voice, vivid sensory details, and engaging pacing.
-- Ensure natural dialogue and well-developed emotional resonance.
-- Maintain stylistic consistency and polished narrative flow throughout.`;
-    improvements.push('Specified sensory detail and pacing guidelines.');
-    improvements.push('Enhanced stylistic polish and emotional depth.');
+  let refined = corrected;
+  if (ALREADY_REFINED.test(prompt)) {
+    improvements.push('Prompt already contains a requirements list; only spelling and grammar were adjusted.');
   } else {
-    // General refinement
-    refined = `Please provide a comprehensive, well-structured, and accurate answer to: "${prompt}".
-- Break down the core concepts clearly with relevant context.
-- Use clear headings, bullet points, or code blocks where appropriate.
-- Highlight practical implications or actionable takeaways.`;
-    improvements.push('Added structural clarity with headings and key takeaways.');
-    improvements.push('Requested actionable context and clarity.');
+    const requirements = categoryRequirements(category, analysis, lower);
+    for (const c of analysis.constraints || []) {
+      if (CONSTRAINT_REQUIREMENTS[c]) requirements.push(CONSTRAINT_REQUIREMENTS[c]);
+    }
+    if ((analysis.missingInfoNotes || []).some(n => /language not explicitly/i.test(n)) && category !== 'Coding') {
+      requirements.push('If a programming language is needed, choose a suitable one and say which.');
+    }
+    if ((analysis.missingInfoNotes || []).some(n => /very brief/i.test(n))) {
+      requirements.push('If the request is ambiguous, state the interpretation you chose.');
+    }
+    const unique = [...new Set(requirements)];
+    refined = `${corrected}\n\n${REQUIREMENTS_HEADER}\n${unique.map(r => `- ${r}`).join('\n')}`;
+    improvements.push(`Added ${unique.length} ${category.toLowerCase()} requirements while keeping your original wording.`);
   }
 
   // Structured Breakdown
+  const isCoding = category === 'Coding';
   let expectedComplexity = 'O(1) to O(N) Standard';
-  if (/\bprime|matrix|sort|search|graph|tree|dynamic programming|dp\b/i.test(lower)) {
+  if (/\b(prime|matrix|sort|search|graph|tree|dynamic programming|dp)\b/i.test(lower)) {
     expectedComplexity = 'Algorithmic O(√N) to O(N log N)';
   } else if (!isCoding) {
     expectedComplexity = 'Conceptual / Multi-step Synthesis';
   }
 
+  const constraints = analysis.constraints || [];
+  const technologies = analysis.technologies || [];
+  const missingInfo = analysis.missingInfoNotes || [];
   const breakdown = {
-    goal: `Fulfill the user's request: ${prompt.length > 80 ? prompt.substring(0, 77) + '...' : prompt}`,
-    taskType: analysis.primaryCategory,
+    goal: `Fulfill the user's request: ${corrected.length > 80 ? corrected.substring(0, 77) + '...' : corrected}`,
+    taskType: category,
     requiredOutput: analysis.requestedOutputType,
-    constraints: analysis.constraints.length > 0 ? analysis.constraints : ['Accuracy, clarity, and idiomatic best practices'],
-    technologies: analysis.technologies.length > 0 ? analysis.technologies : ['General AI / Domain standard'],
-    expectedComplexity: expectedComplexity,
-    assumptions: analysis.missingInfoNotes.length > 0 ? analysis.missingInfoNotes : ['Standard modern environment and default parameters assumed']
+    constraints: constraints.length > 0 ? constraints : ['Accuracy, clarity, and idiomatic best practices'],
+    technologies: technologies.length > 0 ? technologies : ['General AI / Domain standard'],
+    expectedComplexity,
+    assumptions: missingInfo.length > 0 ? missingInfo : ['Standard modern environment and default parameters assumed']
   };
 
   return {
     originalPrompt: prompt,
+    correctedPrompt: corrected,
     refinedPrompt: refined,
+    corrections,
+    flaggedWords: flagged,
     improvements,
+    refinementMethod: 'rules',
     breakdown
   };
 }

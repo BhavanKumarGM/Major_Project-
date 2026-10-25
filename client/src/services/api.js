@@ -27,7 +27,10 @@ function adminHeaders() {
 async function handleResponse(res) {
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || `HTTP error ${res.status}: ${res.statusText}`);
+    const err = new Error(errorData.error || `HTTP error ${res.status}: ${res.statusText}`);
+    err.code = errorData.code;
+    err.status = res.status;
+    throw err;
   }
   return res.json();
 }
@@ -99,11 +102,12 @@ export const api = {
     return handleResponse(res);
   },
 
-  async preflightPrompt(prompt) {
+  // skipRefinement: analyze and rank an already accepted refined prompt without refining it again
+  async preflightPrompt(prompt, { skipRefinement = false } = {}) {
     const res = await fetch(`${BASE_URL}/preflight-prompt`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify({ prompt, skipRefinement })
     });
     return handleResponse(res);
   },
@@ -158,6 +162,36 @@ export const api = {
         options,
         revisionSettings
       })
+    });
+    return handleResponse(res);
+  },
+
+  // Opt-in AI rewrite of the prompt (one billable call; falls back to rule-based refinement)
+  async refinePromptAI({ prompt, modelId = null }) {
+    const res = await fetch(`${BASE_URL}/refine-prompt-ai`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, modelId })
+    });
+    return handleResponse(res);
+  },
+
+  // Single AI Mode: preview the Decision Model's choice (no LLM calls)
+  async decideModel({ prompt, modelId = null, options = {} }) {
+    const res = await fetch(`${BASE_URL}/decide-model`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, modelId, options })
+    });
+    return handleResponse(res);
+  },
+
+  // Single AI Mode: decide, generate once, evaluate and save the turn on the server
+  async decisionExecute({ prompt, conversationId = null, modelId = null, documentContext = null, options = {} }) {
+    const res = await fetch(`${BASE_URL}/decision-execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, conversationId, executionMode: 'single', modelId, documentContext, options })
     });
     return handleResponse(res);
   },

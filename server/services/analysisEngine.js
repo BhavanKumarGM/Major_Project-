@@ -3,6 +3,8 @@
  * Analyzes raw user prompts for intent distribution, category, constraints, and ambiguity.
  */
 
+import { correctPrompt } from './spellingService.js';
+
 export function analyzePrompt(rawPrompt) {
   if (!rawPrompt || typeof rawPrompt !== 'string' || !rawPrompt.trim()) {
     return {
@@ -18,7 +20,8 @@ export function analyzePrompt(rawPrompt) {
     };
   }
 
-  const prompt = rawPrompt.trim();
+  // Classify the spell-corrected text so typos ("pyhton", "fuction") don't hide the intent
+  const prompt = correctPrompt(rawPrompt).text;
   const lower = prompt.toLowerCase();
 
   // 1. Detect Technologies / Languages

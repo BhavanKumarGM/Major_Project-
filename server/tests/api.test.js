@@ -5,7 +5,9 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-const BASE_URL = 'http://127.0.0.1:5050/api';
+// Dedicated port so the suite never talks to a running dev server (and its real keys and data)
+const TEST_PORT = process.env.TEST_PORT || '5099';
+const BASE_URL = `http://127.0.0.1:${TEST_PORT}/api`;
 let serverProcess = null;
 
 describe('AI Hive Mind — Comprehensive Backend API Test Suite', () => {
@@ -19,7 +21,11 @@ describe('AI Hive Mind — Comprehensive Backend API Test Suite', () => {
     }
 
     serverProcess = spawn(process.execPath, [path.resolve(process.cwd(), 'server.js')], {
-      env: { ...process.env, PORT: '5050', DATA_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'hive-test-')) },
+      // Blank provider keys (dotenv will not override them) so the suite never makes billable calls
+      env: {
+        ...process.env, PORT: TEST_PORT, DATA_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'hive-test-')),
+        SARVAM_API_KEY: '', OPENAI_API_KEY: '', GEMINI_API_KEY: '', ANTHROPIC_API_KEY: '', GROQ_API_KEY: '', OLLAMA_URL: ''
+      },
       stdio: 'inherit'
     });
 
@@ -466,6 +472,39 @@ describe('AI Hive Mind — Comprehensive Backend API Test Suite', () => {
     assert.ok(stats.evaluationMetrics);
     assert.strictEqual(typeof stats.evaluationMetrics.evaluationsCompleted, 'number');
     assert.strictEqual(typeof stats.evaluationMetrics.criticalFailuresDetected, 'number');
+  });
+
+  // 11. Single AI Mode (validation and preview only: no provider calls)
+  it('POST /api/decide-model previews one model without generating', async () => {
+    const res = await fetch(`${BASE_URL}/decide-model`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: 'Implement binary search in Python' })
+    });
+    assert.strictEqual(res.status, 200);
+    const data = await res.json();
+    assert.ok(data.analysis && data.decision);
+    assert.ok(['selected', 'no_live_provider'].includes(data.decision.status));
+    assert.ok(Array.isArray(data.decision.candidates));
+    assert.ok(!('apiKeys' in data.decision));
+  });
+
+  it('POST /api/decision-execute rejects invalid input before calling any model', async () => {
+    const post = body => fetch(`${BASE_URL}/decision-execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    const badModel = await post({ prompt: 'hello there', modelId: 'definitely-not-a-model' });
+    assert.strictEqual(badModel.status, 400);
+    assert.strictEqual((await badModel.json()).code, 'invalid_model');
+
+    const noPrompt = await post({ prompt: '' });
+    assert.strictEqual(noPrompt.status, 400);
+
+    const unknownConv = await post({ prompt: 'hello there', modelId: 'gpt-4o', conversationId: 'missing-id', options: { allowSimulation: true } });
+    assert.strictEqual(unknownConv.status, 404);
   });
 
 });

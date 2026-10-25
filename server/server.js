@@ -17,6 +17,8 @@ import { parseDocument } from './services/documentService.js';
 import { synthesizeResponses } from './services/synthesisService.js';
 import { BenchmarkRankerService } from './services/benchmarkRankerService.js';
 import { loadState, saveState } from './services/persistenceService.js';
+import { validateDecisionRequest, previewDecision, executeDecision, RequestError, MAX_PROMPT_CHARS } from './services/decisionExecutionService.js';
+import { refinePromptWithAI } from './services/aiRefinementService.js';
 
 dotenv.config();
 
@@ -148,12 +150,35 @@ app.post('/api/refine-prompt', (req, res) => {
   }
 });
 
+// 2b. Opt-in AI refinement (one billable call to a configured model; falls back to rules)
+app.post('/api/refine-prompt-ai', async (req, res) => {
+  try {
+    const { prompt, modelId = null } = req.body;
+    if (typeof prompt !== 'string' || !prompt.trim()) {
+      return res.status(400).json({ success: false, code: 'invalid_prompt', error: 'A non-empty prompt is required.' });
+    }
+    if (prompt.length > MAX_PROMPT_CHARS) {
+      return res.status(413).json({ success: false, code: 'prompt_too_long', error: `Prompt exceeds ${MAX_PROMPT_CHARS} characters.` });
+    }
+    if (modelId !== null && !configuredModels.some(m => m.id === modelId)) {
+      return res.status(400).json({ success: false, code: 'invalid_model', error: 'modelId must be one of the configured model ids.' });
+    }
+    const analysis = analyzePrompt(prompt);
+    const refinement = await refinePromptWithAI({ prompt, analysis, models: configuredModels, llmService, modelId });
+    res.json({ analysis, refinement });
+  } catch (err) {
+    console.error('[Refine] Unexpected failure:', llmService.redactSecrets(err.message));
+    res.status(500).json({ success: false, code: 'internal_error', error: 'Prompt refinement failed unexpectedly.' });
+  }
+});
+
 // 3. Model Recommendation
 app.post('/api/recommend-models', (req, res) => {
   try {
     const { prompt, analysis } = req.body;
     const promptAnalysis = analysis || analyzePrompt(prompt);
-    const recommendations = recommendModels(configuredModels, promptAnalysis, id => llmService.hasCredentials(id));
+    const recommendations = recommendModels(configuredModels, promptAnalysis, id => llmService.hasCredentials(id),
+      memoryService.getModelPerformance(promptAnalysis.primaryCategory));
     res.json(recommendations);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -163,10 +188,15 @@ app.post('/api/recommend-models', (req, res) => {
 // 4. Combined Pre-flight Endpoint (Analyze + Refine + Recommend in one pass)
 app.post('/api/preflight-prompt', (req, res) => {
   try {
-    const { prompt } = req.body;
+    const { prompt, skipRefinement = false } = req.body;
     const analysis = analyzePrompt(prompt);
-    const refinement = refinePrompt(prompt, analysis);
-    const recommendations = recommendModels(configuredModels, analysis, id => llmService.hasCredentials(id));
+    let refinement = refinePrompt(prompt, analysis);
+    // An already accepted refined prompt is analyzed and ranked as-is, not refined again
+    if (skipRefinement === true && typeof prompt === 'string') {
+      refinement = { ...refinement, refinedPrompt: prompt.trim(), improvements: ['Using the refined prompt you accepted.'] };
+    }
+    const recommendations = recommendModels(configuredModels, analysis, id => llmService.hasCredentials(id),
+      memoryService.getModelPerformance(analysis.primaryCategory));
 
     res.json({
       analysis,
@@ -197,6 +227,42 @@ app.get('/api/benchmark-categories', (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Single AI Mode: Decision Model preview (deterministic, no LLM calls)
+app.post('/api/decide-model', (req, res) => {
+  try {
+    const request = validateDecisionRequest(req.body, configuredModels);
+    const { analysis, refinement, decision } = previewDecision(request, { models: configuredModels, llmService, memoryService });
+    const { recommendations, ...decisionSummary } = decision;
+    res.json({ analysis, refinement, decision: decisionSummary });
+  } catch (err) {
+    sendDecisionError(res, err);
+  }
+});
+
+// Single AI Mode: decide → generate once → Critic evaluation → save turn
+app.post('/api/decision-execute', async (req, res) => {
+  try {
+    const request = validateDecisionRequest(req.body, configuredModels);
+    const result = await executeDecision(request, {
+      models: configuredModels,
+      criticWeights,
+      llmService,
+      memoryService
+    });
+    res.json(result);
+  } catch (err) {
+    sendDecisionError(res, err);
+  }
+});
+
+function sendDecisionError(res, err) {
+  if (err instanceof RequestError) {
+    return res.status(err.status).json({ success: false, code: err.code, error: err.message });
+  }
+  console.error('[Decision] Unexpected failure:', llmService.redactSecrets(err.message));
+  res.status(500).json({ success: false, code: 'internal_error', error: 'Single AI execution failed unexpectedly.' });
+}
 
 // 5. Multi-Model Parallel Generation
 app.post('/api/generate', async (req, res) => {

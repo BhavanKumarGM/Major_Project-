@@ -5,9 +5,57 @@
  * configured providers that fail report an error instead of fake output.
  */
 
+const SECRET_PATTERNS = [/sk-[A-Za-z0-9_*-]{6,}/g, /gsk_[A-Za-z0-9_*]{6,}/g, /AIza[A-Za-z0-9_-]{10,}/g];
+
+function providerError(status, message) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+}
+
+/**
+ * Maps a provider/network failure to a stable error type the UI can explain.
+ */
+export function classifyProviderError(err) {
+  const status = err?.status;
+  const msg = String(err?.message || '').toLowerCase();
+  if (err?.name === 'TimeoutError' || err?.name === 'AbortError' || msg.includes('timed out')) return 'timeout';
+  if (status === 401 || status === 403) return 'auth';
+  if (status === 402 || /quota|insufficient|billing|credit/.test(msg)) return 'quota';
+  if (status === 429) return 'rate_limit';
+  if (status === 404 || /model .*(not found|does not exist)|invalid model|unknown model/.test(msg)) return 'invalid_model';
+  if (!status && (msg.includes('fetch failed') || ['ECONNREFUSED', 'ENOTFOUND', 'ECONNRESET', 'ETIMEDOUT'].includes(err?.cause?.code))) return 'network';
+  return 'provider_error';
+}
+
+const ERROR_HINTS = {
+  timeout: 'The provider did not answer in time.',
+  auth: 'The provider rejected the API key.',
+  quota: 'The provider account has no remaining quota or credit.',
+  rate_limit: 'The provider is rate-limiting requests; try again shortly.',
+  invalid_model: 'The provider does not recognise the configured model id.',
+  network: 'Could not reach the provider.',
+  provider_error: 'The provider returned an error.'
+};
+
 export class LLMService {
   constructor(apiKeys = {}) {
     this.apiKeys = apiKeys; // { openai, gemini, anthropic, groq, ollamaUrl }
+    this.timeoutMs = Number(process.env.GENERATION_TIMEOUT_MS) || 120000;
+  }
+
+  /**
+   * Removes configured key values and key-shaped tokens from text that may be shown or logged.
+   */
+  redactSecrets(text) {
+    let out = String(text || '');
+    for (const [name, value] of Object.entries(this.apiKeys)) {
+      if (name !== 'ollamaUrl' && typeof value === 'string' && value.length >= 6) {
+        out = out.split(value).join('[redacted]');
+      }
+    }
+    for (const pattern of SECRET_PATTERNS) out = out.replace(pattern, '[redacted]');
+    return out;
   }
 
   updateKeys(newKeys) {
@@ -97,12 +145,16 @@ export class LLMService {
         const result = await liveCall(fullPrompt, conversationContext);
         return { ...result, ...meta, latency: Date.now() - startTime, isLive: true, isSimulated: false };
       } catch (err) {
-        console.warn(`[LLMService] Live call for ${model.id} failed: ${err.message}`);
+        const errorType = classifyProviderError(err);
+        const detail = this.redactSecrets(err.message || 'API call was unable to complete.');
+        const message = `${ERROR_HINTS[errorType]} (${detail})`;
+        console.warn(`[LLMService] Live call for ${model.id} failed [${errorType}]: ${detail}`);
         return {
           ...meta,
           status: 'error',
-          errorMessage: err.message || 'Generation failed',
-          text: `[Error from ${model.name}: ${err.message || 'API call was unable to complete.'}]`,
+          errorType,
+          errorMessage: message,
+          text: `[Error from ${model.name}: ${message}]`,
           tokenUsage: emptyUsage,
           latency: Date.now() - startTime,
           isLive: false,
@@ -195,6 +247,7 @@ export class LLMService {
 
     const res = await fetch('https://api.sarvam.ai/v1/chat/completions', {
       method: 'POST',
+      signal: AbortSignal.timeout(this.timeoutMs),
       headers: {
         'Content-Type': 'application/json',
         'api-subscription-key': this.apiKeys.sarvam
@@ -208,7 +261,7 @@ export class LLMService {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Sarvam AI error ${res.status}`);
+      throw providerError(res.status, err.error?.message || `Sarvam AI error ${res.status}`);
     }
 
     const data = await res.json();
@@ -229,12 +282,13 @@ export class LLMService {
 
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
+      signal: AbortSignal.timeout(this.timeoutMs),
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${this.apiKeys.openai}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: process.env.OPENAI_MODEL || 'gpt-4o',
         messages,
         temperature: 0.7
       })
@@ -242,7 +296,7 @@ export class LLMService {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `OpenAI error ${res.status}`);
+      throw providerError(res.status, err.error?.message || `OpenAI error ${res.status}`);
     }
 
     const data = await res.json();
@@ -267,13 +321,14 @@ export class LLMService {
 
     const res = await fetch(url, {
       method: 'POST',
+      signal: AbortSignal.timeout(this.timeoutMs),
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': this.apiKeys.gemini },
       body: JSON.stringify({ contents })
     });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Gemini error ${res.status}`);
+      throw providerError(res.status, err.error?.message || `Gemini error ${res.status}`);
     }
 
     const data = await res.json();
@@ -301,6 +356,7 @@ export class LLMService {
 
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
+      signal: AbortSignal.timeout(this.timeoutMs),
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${this.apiKeys.groq}`
@@ -314,7 +370,7 @@ export class LLMService {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Groq error ${res.status}`);
+      throw providerError(res.status, err.error?.message || `Groq error ${res.status}`);
     }
 
     const data = await res.json();
@@ -335,6 +391,7 @@ export class LLMService {
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
+      signal: AbortSignal.timeout(this.timeoutMs),
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': this.apiKeys.anthropic,
@@ -351,7 +408,7 @@ export class LLMService {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Anthropic error ${res.status}`);
+      throw providerError(res.status, err.error?.message || `Anthropic error ${res.status}`);
     }
 
     const data = await res.json();
@@ -378,16 +435,16 @@ export class LLMService {
 
     const res = await fetch(url, {
       method: 'POST',
+      signal: AbortSignal.timeout(this.timeoutMs),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'llama3',
         messages,
         stream: false
-      }),
-      signal: AbortSignal.timeout(15000)
+      })
     });
 
-    if (!res.ok) throw new Error(`Ollama responded with HTTP ${res.status}`);
+    if (!res.ok) throw providerError(res.status, `Ollama responded with HTTP ${res.status}`);
     const data = await res.json();
     return {
       text: data.message?.content || '',

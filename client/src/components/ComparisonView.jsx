@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { 
   Scale, 
@@ -36,6 +36,12 @@ export default function ComparisonView({
   const [copiedId, setCopiedId] = useState(null);
   const [showFullCritic, setShowFullCritic] = useState(true);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
+  // After the user picks a branch, only that answer is shown until they expand the rest
+  const [showAllResponses, setShowAllResponses] = useState(false);
+
+  useEffect(() => {
+    setShowAllResponses(false);
+  }, [activeSelectedModelId]);
 
   if (!turnData || !turnData.responses || turnData.responses.length === 0) {
     return null;
@@ -44,6 +50,18 @@ export default function ComparisonView({
   const responses = turnData.responses;
   const critic = turnData.criticEvaluation;
   const isMultiple = responses.length > 1;
+  const isCollapsed = isMultiple && turnData.branchChosenByUser && !showAllResponses;
+  const chosenIsSynthesis = activeSelectedModelId === 'synthesis' && !!turnData.synthesis;
+  const visibleResponses = isCollapsed
+    ? responses.filter(r => !chosenIsSynthesis && r.modelId === activeSelectedModelId)
+    : responses;
+  // Collapsed turns also limit the critic details to the chosen model (issues without a model stay)
+  const focusOnChosen = isCollapsed && !chosenIsSynthesis;
+  const visibleEvaluations = (critic?.evaluations || []).filter(ev => !focusOnChosen || ev.modelId === activeSelectedModelId);
+  const visibleIssues = (critic?.issues || []).filter(iss => !focusOnChosen || !iss.modelId || iss.modelId === activeSelectedModelId);
+  const chosenName = chosenIsSynthesis
+    ? 'Hive Mind Synthesis'
+    : responses.find(r => r.modelId === activeSelectedModelId)?.modelName;
 
   const handleCopy = (id, text) => {
     navigator.clipboard.writeText(text);
@@ -66,6 +84,24 @@ export default function ComparisonView({
 
   return (
     <div className="comparison-arena-wrap">
+      {/* Chosen-branch focus bar */}
+      {isMultiple && turnData.branchChosenByUser && (
+        <div className="chosen-branch-bar">
+          <span>
+            {isCollapsed
+              ? <>Showing your chosen answer{chosenName ? <> from <strong>{chosenName}</strong></> : null}. {responses.length - visibleResponses.length} other response(s) hidden.</>
+              : <>Showing all {responses.length} responses.</>}
+          </span>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => setShowAllResponses(!showAllResponses)}
+            aria-expanded={!isCollapsed}
+          >
+            {isCollapsed ? `Show all ${responses.length} responses` : 'Show only chosen answer'}
+          </button>
+        </div>
+      )}
+
       {/* Evidence-Based Critic AI Evaluation Scorecard */}
       {critic && (
         <div className="critic-evaluation-panel glass-panel">
@@ -162,7 +198,7 @@ export default function ComparisonView({
                     </tr>
                   </thead>
                   <tbody>
-                    {critic.evaluations?.map((ev) => {
+                    {visibleEvaluations.map((ev) => {
                       const isWinner = ev.modelId === critic.winner?.modelId;
                       const hasCritical = ev.hasCriticalFailure || ev.isEligible === false;
 
@@ -215,7 +251,7 @@ export default function ComparisonView({
                   <FileSearch size={14} />
                   <span>
                     {showDiagnostics ? 'Hide Evidence Diagnostics' : 'Inspect Evidence Diagnostics & Requirement Audit'}
-                    {critic.issues?.length > 0 ? ` (${critic.issues.length} findings)` : ''}
+                    {visibleIssues.length > 0 ? ` (${visibleIssues.length} findings)` : ''}
                   </span>
                   {showDiagnostics ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                 </button>
@@ -286,9 +322,9 @@ export default function ComparisonView({
                       <ShieldAlert size={14} className="text-amber" />
                       <span>Evidence-Backed Root Cause Diagnostics</span>
                     </h4>
-                    {critic.issues?.length > 0 ? (
+                    {visibleIssues.length > 0 ? (
                       <div className="issues-grid">
-                        {critic.issues.map((iss) => (
+                        {visibleIssues.map((iss) => (
                           <div key={iss.id} className={`issue-card ${iss.isCritical ? 'issue-critical' : ''}`}>
                             <div className="issue-header">
                               <span className={`issue-severity sev-${iss.severity}`}>{iss.severity.toUpperCase()}</span>
@@ -327,7 +363,7 @@ export default function ComparisonView({
 
               {/* Strengths & Weaknesses Comparison Grid */}
               <div className="critique-details-grid">
-                {critic.evaluations?.map((ev) => (
+                {visibleEvaluations.map((ev) => (
                   <div key={ev.modelId} className="critique-card glass-card">
                     <div className="critique-card-title">
                       <span>{ev.avatar} {ev.modelName} Critique</span>
@@ -366,7 +402,7 @@ export default function ComparisonView({
       )}
 
       {/* Synthesis Banner (Optional consensus generation) */}
-      {isMultiple && onSynthesize && (
+      {isMultiple && onSynthesize && !isCollapsed && (
         <div className="synthesis-action-bar">
           <div className="synthesis-text">
             <Sparkles size={16} className="text-purple" />
@@ -385,7 +421,7 @@ export default function ComparisonView({
       )}
 
       {/* Synthesis Active Display (If synthesized) */}
-      {turnData.synthesis && (
+      {turnData.synthesis && (!isCollapsed || chosenIsSynthesis) && (
         <div className="synthesis-response-card glass-panel">
           <div className="response-card-header">
             <div className="model-id-badge">
@@ -421,8 +457,8 @@ export default function ComparisonView({
       )}
 
       {/* Side-by-Side Model Response Columns */}
-      <div className={`response-columns-container ${responses.length > 1 ? 'multi-col' : 'single-col'}`}>
-        {responses.map((resp, index) => {
+      <div className={`response-columns-container ${visibleResponses.length > 1 ? 'multi-col' : 'single-col'}`}>
+        {visibleResponses.map((resp, index) => {
           const isSelectedBranch = activeSelectedModelId === resp.modelId;
           const isCriticPick = critic?.winner?.modelId === resp.modelId;
 
@@ -791,6 +827,21 @@ export default function ComparisonView({
         .status-unverifiable { background: rgba(6, 182, 212, 0.15); color: #67e8f9; }
         .evidence-cell { color: #94a3b8; font-family: var(--font-mono); font-size: 0.75rem; }
         .correction-cell { color: #fef08a; font-size: 0.75rem; }
+        .chosen-branch-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 0.6rem;
+          padding: 0.55rem 0.9rem;
+          margin-bottom: 0.75rem;
+          font-size: 0.82rem;
+          color: var(--text-secondary);
+          background: rgba(16, 185, 129, 0.07);
+          border: 1px solid rgba(16, 185, 129, 0.25);
+          border-radius: var(--radius-md);
+        }
+        .chosen-branch-bar strong { color: var(--text-primary); }
         .issues-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));

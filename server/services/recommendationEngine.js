@@ -4,7 +4,14 @@
  * and outputs transparent, explainable recommendations.
  */
 
-export function recommendModels(models, analysis, isAvailable = () => true) {
+// Past Critic results start to count once a model has this many evaluated live answers
+export const MIN_OBSERVATIONS = 3;
+const OBSERVED_WEIGHT = 0.3;
+
+/**
+ * @param performance optional { [modelId]: { avgScore, count } } from memoryService.getModelPerformance()
+ */
+export function recommendModels(models, analysis, isAvailable = () => true, performance = {}) {
   const intentWeights = {};
   
   // Default mapping of prompt categories to capability profile keys
@@ -45,7 +52,14 @@ export function recommendModels(models, analysis, isAvailable = () => true) {
       score += 1.5; // slight speed bonus
     }
 
-    const finalScore = Math.min(99, Math.max(50, Math.round(score * 10) / 10));
+    const profileScore = Math.min(99, Math.max(50, Math.round(score * 10) / 10));
+
+    // Blend in how this model actually scored with the Critic on this task type
+    const observed = performance[model.id];
+    const hasObserved = observed && observed.count >= MIN_OBSERVATIONS;
+    const finalScore = hasObserved
+      ? Math.min(99, Math.max(50, Math.round(((1 - OBSERVED_WEIGHT) * profileScore + OBSERVED_WEIGHT * observed.avgScore) * 10) / 10))
+      : profileScore;
 
     // Formulate rationale based on prompt type and model traits
     let rationale = '';
@@ -64,16 +78,22 @@ export function recommendModels(models, analysis, isAvailable = () => true) {
       rationale = 'Ultra-low latency inference, large context handling, and rapid code generation.';
     } else if (model.id === 'llama-3-3-70b') {
       rationale = 'Fast execution with strong open-weight logic and efficient step-by-step reasoning.';
-    } else if (model.id === 'deepseek-r1') {
-      rationale = 'Extensive chain-of-thought mathematical reasoning and rigorous logic verification.';
-    } else {
+    } else if (model.id === 'sarvam-105b') {
+      rationale = 'Large multilingual model with strong Indic-language coverage and balanced reasoning and coding profiles.';
+    } else if (model.id === 'ollama-local') {
       rationale = 'Reliable local execution with complete data privacy and solid foundational performance.';
+    } else {
+      rationale = `Configured capability profile fits the detected ${analysis.primaryCategory || 'task'} intent.`;
     }
 
     return {
       ...model,
       recommendationScore: finalScore,
-      recommendationRationale: rationale,
+      profileScore,
+      observedPerformance: observed ? { ...observed, applied: Boolean(hasObserved) } : null,
+      recommendationRationale: hasObserved
+        ? `${rationale} Averaged ${observed.avgScore}/100 across ${observed.count} past Critic evaluations for ${analysis.primaryCategory}.`
+        : rationale,
       isTopPick: false,
       isAvailable: Boolean(isAvailable(model.id))
     };

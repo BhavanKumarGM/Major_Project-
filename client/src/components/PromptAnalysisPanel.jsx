@@ -26,6 +26,8 @@ export default function PromptAnalysisPanel({
   onUseRefined,
   onUseOriginal,
   onSelectRecommendedModels,
+  onImproveWithAI,
+  isImprovingWithAI = false,
   onClose
 }) {
   const [activeTab, setActiveTab] = useState('refinement'); // 'refinement' | 'breakdown' | 'recommendation' | 'benchmark'
@@ -157,6 +159,11 @@ export default function PromptAnalysisPanel({
               <div className="card-label">
                 <Sparkles size={14} className="text-cyan" />
                 <span>Refined & Augmented Prompt</span>
+                {refinement?.refinementMethod === 'ai' ? (
+                  <span className="method-tag method-ai" title="Rewritten by a live model">AI · {refinement.refinedBy?.modelName}</span>
+                ) : refinement?.refinedPrompt ? (
+                  <span className="method-tag" title="Offline spelling fixes + rule-based requirements">Rules</span>
+                ) : null}
               </div>
               <div className="card-actions">
                 <button className="btn-icon" onClick={() => handleCopy(refinement?.refinedPrompt || '')} title="Copy">
@@ -167,6 +174,24 @@ export default function PromptAnalysisPanel({
                 </button>
               </div>
             </div>
+
+            {refinement?.corrections?.some(c => c.type === 'spelling') && (
+              <div className="corrections-row" aria-label="Spelling corrections">
+                {refinement.corrections.filter(c => c.type === 'spelling').map((c, idx) => (
+                  <span key={idx} className="correction-chip"><s>{c.from}</s> → {c.to}</span>
+                ))}
+              </div>
+            )}
+            {refinement?.flaggedWords?.length > 0 && (
+              <div className="corrections-row" aria-label="Possible typos">
+                {refinement.flaggedWords.map((f, idx) => (
+                  <span key={idx} className="correction-chip chip-flag" title={`Did you mean ${f.suggestions.join(' or ')}?`}>
+                    {f.word}?
+                  </span>
+                ))}
+              </div>
+            )}
+            {refinement?.aiNote && <div className="ai-note">{refinement.aiNote}</div>}
 
             {isEditing ? (
               <div className="edit-wrap">
@@ -211,12 +236,34 @@ export default function PromptAnalysisPanel({
                 <Check size={14} />
                 <span>Use Refined Prompt</span>
               </button>
-              <button 
+              <button
                 className="btn btn-secondary btn-sm"
                 onClick={() => onUseOriginal(refinement?.originalPrompt)}
               >
                 <span>Use Original</span>
               </button>
+            </div>
+            <div className="refinement-action-row">
+              {refinement?.correctedPrompt && refinement.correctedPrompt !== refinement.originalPrompt && (
+                <button
+                  className="btn btn-secondary btn-sm flex-1"
+                  onClick={() => onUseRefined(refinement.correctedPrompt)}
+                  title="Keep your wording with only spelling and grammar fixed"
+                >
+                  <span>Use Spelling Fixes Only</span>
+                </button>
+              )}
+              {onImproveWithAI && (
+                <button
+                  className="btn btn-secondary btn-sm flex-1"
+                  onClick={onImproveWithAI}
+                  disabled={isImprovingWithAI || !refinement?.originalPrompt}
+                  title="Rewrites the prompt with one of your configured models (one billable API call)"
+                >
+                  <Sparkles size={14} className={isImprovingWithAI ? 'animate-spin text-cyan' : 'text-cyan'} />
+                  <span>{isImprovingWithAI ? 'Improving…' : 'Improve with AI'}</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -584,6 +631,28 @@ export default function PromptAnalysisPanel({
           padding: 0.75rem;
           line-height: 1.5;
         }
+        .method-tag {
+          margin-left: 0.4rem;
+          font-size: 0.66rem;
+          font-weight: 700;
+          padding: 0.1rem 0.45rem;
+          border-radius: var(--radius-full);
+          background: rgba(148, 163, 184, 0.15);
+          color: var(--text-secondary);
+        }
+        .method-tag.method-ai { background: rgba(6, 182, 212, 0.15); color: #67e8f9; }
+        .corrections-row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.4rem 0; }
+        .correction-chip {
+          font-size: 0.72rem;
+          padding: 0.15rem 0.5rem;
+          border-radius: var(--radius-full);
+          background: rgba(16, 185, 129, 0.12);
+          border: 1px solid rgba(16, 185, 129, 0.3);
+          color: #6ee7b7;
+        }
+        .correction-chip s { color: var(--text-muted); }
+        .correction-chip.chip-flag { background: rgba(245, 158, 11, 0.12); border-color: rgba(245, 158, 11, 0.3); color: #fcd34d; }
+        .ai-note { font-size: 0.74rem; color: #fcd34d; margin: 0.35rem 0; }
         .improvements-list {
           margin-top: 0.75rem;
           background: rgba(16, 185, 129, 0.05);

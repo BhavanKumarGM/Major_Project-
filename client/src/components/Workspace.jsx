@@ -20,13 +20,21 @@ import {
   HelpCircle,
   CheckCircle2,
   CheckSquare,
-  Square
+  Square,
+  Compass
 } from 'lucide-react';
 import { api } from '../services/api.js';
 import WorkflowPipeline from './WorkflowPipeline.jsx';
 import PromptAnalysisPanel from './PromptAnalysisPanel.jsx';
 import ComparisonView from './ComparisonView.jsx';
 import BranchViewer from './BranchViewer.jsx';
+import { DecisionRunPanel, DecisionTurnPanel } from './DecisionPanel.jsx';
+
+const JUDGE_PREF_KEY = 'hiveJudgeEnabled';
+
+function readJudgePref() {
+  try { return localStorage.getItem(JUDGE_PREF_KEY) === 'true'; } catch { return false; }
+}
 
 export default function Workspace({ 
   models = [], 
@@ -41,9 +49,20 @@ export default function Workspace({
   const [activeConversation, setActiveConversation] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Mode Selection: 'auto' | 'single' | 'compare' | 'critic'
-  const [activeMode, setActiveMode] = useState('compare'); 
+  // Execution Mode: 'single' (Decision Model picks one AI) | 'compare' (Multi AI arena)
+  const [activeMode, setActiveMode] = useState('compare');
   const [selectedModelIds, setSelectedModelIds] = useState(['gemini-2-5-flash', 'llama-3-3-70b']);
+  // Single AI: null = Decision Model chooses; a model id = manual override
+  const [singleModelOverride, setSingleModelOverride] = useState(null);
+  // Single AI run in progress or blocked: { stage, prompt, decision, error }
+  const [singleRun, setSingleRun] = useState(null);
+  // Optional LLM judge: an extra billable provider call, off unless the user turns it on
+  const [judgeEnabled, setJudgeEnabled] = useState(readJudgePref);
+  // A refined prompt the user accepted: sent as-is instead of being refined again
+  const [adoptedRefinedPrompt, setAdoptedRefinedPrompt] = useState(null);
+  const [isImprovingWithAI, setIsImprovingWithAI] = useState(false);
+  // Explains an automatic model switch made after a refined prompt was accepted
+  const [modelSwitchNotice, setModelSwitchNotice] = useState(null);
 
   // Composer State
   const [inputPrompt, setInputPrompt] = useState(initialPrompt);
@@ -85,6 +104,7 @@ export default function Workspace({
       setSelectedModelIds(initialModelIds);
       if (initialModelIds.length === 1) {
         setActiveMode('single');
+        setSingleModelOverride(initialModelIds[0]);
       } else {
         setActiveMode('compare');
       }
@@ -154,11 +174,7 @@ export default function Workspace({
       const data = await api.preflightPrompt(text);
       setPreflightData(data);
       setCurrentPipelineStage('refine');
-      
-      // If in Auto Mode, auto-apply top recommendation
-      if (activeMode === 'auto' && data.recommendations?.topRecommendation) {
-        setSelectedModelIds([data.recommendations.topRecommendation.modelId]);
-      }
+
     } catch (err) {
       console.error('Preflight analysis error:', err);
     } finally {
@@ -166,10 +182,16 @@ export default function Workspace({
     }
   };
 
+  const handleToggleJudge = () => {
+    const next = !judgeEnabled;
+    setJudgeEnabled(next);
+    try { localStorage.setItem(JUDGE_PREF_KEY, String(next)); } catch { /* storage unavailable */ }
+  };
+
   // Toggle model selection
   const handleToggleModel = (modelId) => {
     if (activeMode === 'single') {
-      setSelectedModelIds([modelId]);
+      setSingleModelOverride(singleModelOverride === modelId ? null : modelId);
     } else {
       if (selectedModelIds.includes(modelId)) {
         if (selectedModelIds.length > 1) {
@@ -197,21 +219,138 @@ export default function Workspace({
     }
   };
 
+  // SINGLE AI MODE: preflight → Decision Model → one generation + Critic + save (server)
+  const isAdopted = (text) => !!adoptedRefinedPrompt && text === adoptedRefinedPrompt.trim();
+
+  // Opt-in AI rewrite of the current prompt (one billable call on the server)
+  const handleImproveWithAI = async () => {
+    const text = inputPrompt.trim();
+    if (!text || isImprovingWithAI) return;
+    setIsImprovingWithAI(true);
+    try {
+      const data = await api.refinePromptAI({ prompt: text });
+      setPreflightData(prev => ({ ...(prev || {}), analysis: data.analysis, refinement: data.refinement }));
+      setShowAnalysisPanel(true);
+    } catch (err) {
+      alert('AI refinement error: ' + err.message);
+    } finally {
+      setIsImprovingWithAI(false);
+    }
+  };
+
+  // After a refined prompt is accepted, re-rank models on that text and switch to the best available ones
+  const applyBestModelsFor = async (text) => {
+    try {
+      const pf = await api.preflightPrompt(text, { skipRefinement: true });
+      setPreflightData(pf);
+
+      if (activeMode === 'single') {
+        setSingleModelOverride(null);
+        const { decision } = await api.decideModel({ prompt: text });
+        setModelSwitchNotice(decision.status === 'selected'
+          ? `For the refined prompt the Decision Model will use ${decision.selectedModelName}. ${decision.reason}`
+          : decision.reason);
+        return;
+      }
+
+      const best = (pf.recommendations?.models || []).filter(m => m.isAvailable).slice(0, 2);
+      if (best.length === 0) {
+        setModelSwitchNotice('No configured model has API credentials, so the model selection was not changed.');
+        return;
+      }
+      setSelectedModelIds(best.map(m => m.id));
+      setModelSwitchNotice(`For the refined prompt (${pf.analysis?.primaryCategory || 'General'}) switched to the best available model${best.length > 1 ? 's' : ''}: ` +
+        best.map(m => `${m.name} (${m.recommendationScore}${m.observedPerformance?.applied ? `, avg Critic ${m.observedPerformance.avgScore} over ${m.observedPerformance.count} answers` : ''})`).join(' and ') + '.');
+    } catch (err) {
+      console.error('Model re-ranking failed:', err);
+    }
+  };
+
+  const runSingleAI = async (promptToSend, { modelId = singleModelOverride, allowSimulation = false } = {}) => {
+    if (!promptToSend || isGenerating) return;
+    setIsGenerating(true);
+    const docText = attachedDoc ? attachedDoc.fullText : null;
+    const skipRefinement = isAdopted(promptToSend);
+
+    try {
+      setSingleRun({ stage: 'analyze', prompt: promptToSend });
+      setCurrentPipelineStage('analyze');
+      if (!skipRefinement && (!preflightData || preflightData.refinement?.originalPrompt !== promptToSend)) {
+        setPreflightData(await api.preflightPrompt(promptToSend));
+      }
+
+      setSingleRun({ stage: 'select', prompt: promptToSend });
+      setCurrentPipelineStage('select_model');
+      const preview = await api.decideModel({ prompt: promptToSend, modelId, options: { allowSimulation } });
+      if (preview.decision.status !== 'selected') {
+        setSingleRun({ stage: 'blocked', prompt: promptToSend, modelId, decision: preview.decision });
+        return;
+      }
+
+      setSingleRun({ stage: 'execute', prompt: promptToSend, decision: preview.decision });
+      setCurrentPipelineStage('generate');
+      const result = await api.decisionExecute({
+        prompt: promptToSend,
+        conversationId: activeConversationId,
+        modelId,
+        documentContext: docText,
+        options: { enableLLMJudge: judgeEnabled, allowSimulation, skipRefinement }
+      });
+
+      if (!result.conversation) {
+        // Availability changed between preview and execution
+        setSingleRun({ stage: 'blocked', prompt: promptToSend, modelId, decision: result.decision });
+        return;
+      }
+
+      setSingleRun(null);
+      await loadConversation(result.conversation.id);
+      await loadConversations();
+      setInputPrompt('');
+      setAttachedDoc(null);
+      setCurrentPipelineStage(result.success ? 'critic' : 'generate');
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    } catch (err) {
+      setSingleRun({ stage: 'error', prompt: promptToSend, error: err.message });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleRetrySingle = (turn) => {
+    runSingleAI(turn.userPrompt, { modelId: turn.decision?.selectionMethod === 'manual' ? turn.decision.selectedModelId : null });
+  };
+
+  const handleRunWithModel = (turn, modelId) => {
+    setSingleModelOverride(modelId);
+    runSingleAI(turn.userPrompt, { modelId });
+  };
+
+  const handleSwitchToMulti = (prompt) => {
+    setActiveMode('compare');
+    setSingleRun(null);
+    if (prompt) setInputPrompt(prompt);
+  };
+
   // MAIN SUBMIT ACTION: Full Loop Execution
   const handleSendPrompt = async () => {
     const promptToSend = inputPrompt.trim();
     if (!promptToSend || isGenerating) return;
+    if (activeMode === 'single') return runSingleAI(promptToSend);
 
     setIsGenerating(true);
     setCurrentPipelineStage('generate');
 
     try {
       // 1. Ensure Preflight is completed
+      // Re-run when the analysis belongs to older text (preflight runs while typing)
       let pf = preflightData;
-      if (!pf) {
+      if (!pf || (!isAdopted(promptToSend) && pf.refinement?.originalPrompt !== promptToSend)) {
         pf = await api.preflightPrompt(promptToSend);
         setPreflightData(pf);
       }
+
+      const refinedToSend = isAdopted(promptToSend) ? promptToSend : (pf.refinement?.refinedPrompt || promptToSend);
 
       // 2. Ensure Conversation Exists
       let convId = activeConversationId;
@@ -224,7 +363,7 @@ export default function Workspace({
       // 3. Parallel Multi-Model Generation
       const targetModelIds = selectedModelIds.length > 0 ? selectedModelIds : ['gemini-2-5-flash', 'llama-3-3-70b'];
       const genResult = await api.generateResponses({
-        prompt: pf.refinement?.refinedPrompt || promptToSend,
+        prompt: refinedToSend,
         modelIds: targetModelIds,
         conversationId: convId,
         documentContext: attachedDoc ? attachedDoc.fullText : ''
@@ -238,11 +377,12 @@ export default function Workspace({
         setCurrentPipelineStage('critic');
         criticResult = await api.criticEvaluate({
           originalPrompt: promptToSend,
-          refinedPrompt: pf.refinement?.refinedPrompt || promptToSend,
+          refinedPrompt: refinedToSend,
           responses: genResult.responses,
           weights: criticWeights,
           analysis: pf.analysis,
-          documentContext: attachedDoc ? attachedDoc.fullText : ''
+          documentContext: attachedDoc ? attachedDoc.fullText : '',
+          options: { enableLLMJudge: judgeEnabled }
         });
       }
 
@@ -252,13 +392,14 @@ export default function Workspace({
       // 6. Save Turn to Backend Shared Memory
       const saveRes = await api.saveTurn(convId, {
         userPrompt: promptToSend,
-        refinedPrompt: pf.refinement?.refinedPrompt || promptToSend,
+        refinedPrompt: refinedToSend,
         analysis: pf.analysis,
         breakdown: pf.refinement?.breakdown,
         recommendations: pf.recommendations,
         responses: genResult.responses,
         criticEvaluation: criticResult,
-        selectedModelId: defaultSelectedId
+        selectedModelId: defaultSelectedId,
+        executionMode: 'multi'
       });
 
       // 7. Refresh Conversation
@@ -388,28 +529,31 @@ export default function Workspace({
           <div className="header-left">
             <h2 className="current-chat-title">{activeConversation?.title || 'New Hive Mind Chat'}</h2>
             <div className="mode-toggle-group">
-              <span className="mode-label">Mode:</span>
-              <button 
-                className={`mode-chip ${activeMode === 'auto' ? 'active' : ''}`}
-                onClick={() => setActiveMode('auto')}
-                title="Auto analyzes prompt and picks optimal model"
-              >
-                Auto Recommend
-              </button>
-              <button 
-                className={`mode-chip ${activeMode === 'single' ? 'active' : ''}`}
-                onClick={() => { setActiveMode('single'); if (selectedModelIds.length > 1) setSelectedModelIds([selectedModelIds[0]]); }}
-                title="Explicit single model execution"
-              >
-                Single Model
-              </button>
-              <button 
-                className={`mode-chip ${activeMode === 'compare' ? 'active' : ''}`}
-                onClick={() => setActiveMode('compare')}
-                title="Parallel multi-model comparison with Critic AI"
-              >
-                Multi-Model Arena
-              </button>
+              <span className="mode-label" id="exec-mode-label">Execution:</span>
+              <div role="radiogroup" aria-labelledby="exec-mode-label" className="mode-toggle-group">
+                <button
+                  role="radio"
+                  aria-checked={activeMode === 'single'}
+                  className={`mode-chip ${activeMode === 'single' ? 'active' : ''}`}
+                  onClick={() => setActiveMode('single')}
+                  title="The Decision Model picks one AI, runs it and evaluates the answer"
+                >
+                  Single AI
+                </button>
+                <button
+                  role="radio"
+                  aria-checked={activeMode === 'compare'}
+                  className={`mode-chip ${activeMode === 'compare' ? 'active' : ''}`}
+                  onClick={() => { setActiveMode('compare'); setSingleRun(null); }}
+                  title="Parallel multi-model comparison with Critic AI"
+                >
+                  Multi AI
+                </button>
+              </div>
+              <label className="judge-toggle" title="Grades answers with an extra LLM call (Gemini by default). Billable; skipped if that provider has no key.">
+                <input type="checkbox" checked={judgeEnabled} onChange={handleToggleJudge} />
+                <span>LLM judge</span>
+              </label>
             </div>
           </div>
 
@@ -485,8 +629,18 @@ export default function Workspace({
                   )}
                 </div>
 
+                {turn.executionMode === 'single' && (
+                  <DecisionTurnPanel
+                    turn={turn}
+                    disabled={isGenerating}
+                    onRetry={handleRetrySingle}
+                    onRunWithModel={handleRunWithModel}
+                    onSwitchToMulti={(t) => handleSwitchToMulti(t.userPrompt)}
+                  />
+                )}
+
                 {/* Multi-Model Comparison Arena & Critic AI */}
-                <ComparisonView 
+                <ComparisonView  
                   turnData={turn}
                   onSelectBranch={(modelId) => handleSelectBranch(turn.turnId, modelId)}
                   onSynthesize={() => handleSynthesizeTurn(turn)}
@@ -497,7 +651,17 @@ export default function Workspace({
             ))
           )}
 
-          {isGenerating && (
+          {activeMode === 'single' && singleRun && (
+            <DecisionRunPanel
+              run={singleRun}
+              onRunSimulation={() => runSingleAI(singleRun.prompt, { modelId: singleRun.modelId ?? singleModelOverride, allowSimulation: true })}
+              onOpenSettings={onOpenSettings}
+              onSwitchToMulti={() => handleSwitchToMulti(singleRun.prompt)}
+              onDismiss={() => setSingleRun(null)}
+            />
+          )}
+
+          {isGenerating && activeMode !== 'single' && (
             <div className="generating-indicator glass-panel">
               <Loader2 size={20} className="animate-spin text-cyan" />
               <div>
@@ -512,18 +676,40 @@ export default function Workspace({
 
         {/* 3. BOTTOM COMPOSER AREA */}
         <div className="composer-container glass-panel">
+          {modelSwitchNotice && (
+            <div className="model-switch-notice" role="status">
+              <Compass size={14} className="text-cyan" aria-hidden="true" />
+              <span>{modelSwitchNotice}</span>
+              <button className="btn-icon" onClick={() => setModelSwitchNotice(null)} aria-label="Dismiss notice">
+                <X size={13} />
+              </button>
+            </div>
+          )}
+
           {/* Model Selection Chips Bar */}
           <div className="models-select-bar">
-            <span className="select-bar-label">Active Models:</span>
+            <span className="select-bar-label">{activeMode === 'single' ? 'AI Model:' : 'Active Models:'}</span>
             <div className="models-chips-scroll">
+              {activeMode === 'single' && (
+                <button
+                  className={`model-pill ${singleModelOverride === null ? 'selected' : ''}`}
+                  onClick={() => setSingleModelOverride(null)}
+                  title="Let the Decision Model choose the most suitable configured model"
+                  aria-pressed={singleModelOverride === null}
+                >
+                  <Compass size={13} className="text-cyan" />
+                  <span className="pill-name">Auto (Decision Model)</span>
+                </button>
+              )}
               {models.map(m => {
-                const isSelected = selectedModelIds.includes(m.id);
+                const isSelected = activeMode === 'single' ? singleModelOverride === m.id : selectedModelIds.includes(m.id);
                 return (
                   <button
                     key={m.id}
                     className={`model-pill ${isSelected ? 'selected' : ''}`}
                     onClick={() => handleToggleModel(m.id)}
                     title={`${m.name} (${m.provider}) - ${m.description}`}
+                    aria-pressed={isSelected}
                   >
                     <span className="status-dot active"></span>
                     <span className="pill-avatar">{m.avatar}</span>
@@ -612,10 +798,14 @@ export default function Workspace({
           recommendations={preflightData?.recommendations}
           onUseRefined={(refined) => {
             if (refined) {
+              // Already refined: keep the analysis and send this text without refining it again
               setInputPrompt(refined);
-              runPreflight(refined);
+              setAdoptedRefinedPrompt(refined);
+              applyBestModelsFor(refined);
             }
           }}
+          onImproveWithAI={handleImproveWithAI}
+          isImprovingWithAI={isImprovingWithAI}
           onUseOriginal={(orig) => {
             if (orig) setInputPrompt(orig);
           }}
@@ -627,6 +817,29 @@ export default function Workspace({
       )}
 
       <style>{`
+        .model-switch-notice {
+          display: flex;
+          align-items: flex-start;
+          gap: 0.5rem;
+          font-size: 0.78rem;
+          color: var(--text-secondary);
+          background: rgba(6, 182, 212, 0.08);
+          border: 1px solid rgba(6, 182, 212, 0.25);
+          border-radius: var(--radius-sm);
+          padding: 0.45rem 0.65rem;
+          margin-bottom: 0.55rem;
+        }
+        .model-switch-notice span { flex: 1; line-height: 1.4; }
+        .judge-toggle {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          margin-left: 0.6rem;
+          font-size: 0.75rem;
+          color: var(--text-secondary);
+          cursor: pointer;
+        }
+        .judge-toggle input { accent-color: var(--accent-primary); }
         .workspace-container {
           display: flex;
           height: calc(100vh - 65px);

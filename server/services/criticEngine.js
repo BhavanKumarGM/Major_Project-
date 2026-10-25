@@ -28,11 +28,14 @@ export async function evaluateResponses(
   const revisionSettings = extraContext.revisionSettings || {};
 
   // Setup LLM Judge if an LLM service is passed and judge is enabled
+  // A judge without real credentials would grade simulated text, so it is skipped (status stays 'degraded')
   let judge = null;
-  if (extraContext.llmService && options.enableLLMJudge) {
+  const judgeModel = options.judgeModel || 'gemini-2-5-flash';
+  const judgeAvailable = !extraContext.llmService?.hasCredentials || extraContext.llmService.hasCredentials(judgeModel);
+  if (extraContext.llmService && options.enableLLMJudge && judgeAvailable) {
     judge = new LLMJudge({
       llmService: extraContext.llmService,
-      defaultJudgeModel: options.judgeModel || 'gemini-2-5-flash',
+      defaultJudgeModel: judgeModel,
       enabled: true
     });
   }
@@ -60,7 +63,7 @@ export async function evaluateResponses(
   }
 
   // Standard Evidence Evaluation
-  return runEvidenceEvaluation({
+  const result = await runEvidenceEvaluation({
     originalPrompt,
     refinedPrompt,
     responses,
@@ -71,4 +74,14 @@ export async function evaluateResponses(
     options,
     llmJudge: judge
   });
+
+  if (options.enableLLMJudge && result.evaluationMetadata) {
+    result.evaluationMetadata.judge = {
+      requested: true,
+      model: judgeModel,
+      available: judgeAvailable,
+      note: judgeAvailable ? undefined : `LLM judge skipped: ${judgeModel} has no API credentials.`
+    };
+  }
+  return result;
 }
