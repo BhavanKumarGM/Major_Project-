@@ -29,6 +29,7 @@ import PromptAnalysisPanel from './PromptAnalysisPanel.jsx';
 import ComparisonView from './ComparisonView.jsx';
 import BranchViewer from './BranchViewer.jsx';
 import { DecisionRunPanel, DecisionTurnPanel } from './DecisionPanel.jsx';
+import TurnModelReasons, { shortModelReason } from './ModelReasons.jsx';
 
 const JUDGE_PREF_KEY = 'hiveJudgeEnabled';
 
@@ -37,8 +38,9 @@ function readJudgePref() {
 }
 
 export default function Workspace({ 
-  models = [], 
-  criticWeights, 
+  models = [],
+  modelAvailability = {},
+  criticWeights,
   initialPrompt = '', 
   initialModelIds = null,
   onOpenSettings 
@@ -81,6 +83,8 @@ export default function Workspace({
   // Generation & Execution State
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
+  // Turn being re-graded with the LLM judge, and the last error from doing so
+  const [judgeCheck, setJudgeCheck] = useState({ turnId: null, error: null });
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -189,6 +193,14 @@ export default function Workspace({
   };
 
   // Toggle model selection
+  // Inputs for explaining why a model fits: recommendations for the analysed prompt (if any) and key status
+  const reasonContext = {
+    recommendations: preflightData?.recommendations?.models || [],
+    category: preflightData?.analysis?.primaryCategory || null,
+    availability: modelAvailability,
+    selectedIds: activeMode === 'single' ? (singleModelOverride ? [singleModelOverride] : []) : selectedModelIds
+  };
+
   const handleToggleModel = (modelId) => {
     if (activeMode === 'single') {
       setSingleModelOverride(singleModelOverride === modelId ? null : modelId);
@@ -434,6 +446,19 @@ export default function Workspace({
     }
   };
 
+  // Re-grade a saved turn with the LLM judge (user-triggered; one billable call per answer)
+  const handleCheckWithJudge = async (turnId) => {
+    if (!activeConversationId || judgeCheck.turnId) return;
+    setJudgeCheck({ turnId, error: null });
+    try {
+      await api.reevaluateTurn(activeConversationId, turnId, { enableLLMJudge: true });
+      await loadConversation(activeConversationId);
+      setJudgeCheck({ turnId: null, error: null });
+    } catch (err) {
+      setJudgeCheck({ turnId: null, error: { turnId, message: err.message } });
+    }
+  };
+
   // Synthesis Action
   const handleSynthesizeTurn = async (turn) => {
     if (!activeConversationId || isSynthesizing) return;
@@ -550,7 +575,7 @@ export default function Workspace({
                   Multi AI
                 </button>
               </div>
-              <label className="judge-toggle" title="Grades answers with an extra LLM call (Gemini by default). Billable; skipped if that provider has no key.">
+              <label className="judge-toggle" title="Grades each answer with an extra LLM call, which can catch factual errors the rule checks miss. Uses Gemini 2.5 Flash, or the next model with an API key. Billable: one call per answer.">
                 <input type="checkbox" checked={judgeEnabled} onChange={handleToggleJudge} />
                 <span>LLM judge</span>
               </label>
@@ -629,6 +654,9 @@ export default function Workspace({
                   )}
                 </div>
 
+                {/* Why the model(s) that answered this message were used */}
+                <TurnModelReasons turn={turn} models={models} />
+
                 {turn.executionMode === 'single' && (
                   <DecisionTurnPanel
                     turn={turn}
@@ -646,6 +674,9 @@ export default function Workspace({
                   onSynthesize={() => handleSynthesizeTurn(turn)}
                   isSynthesizing={isSynthesizing}
                   activeSelectedModelId={turn.selectedModelId}
+                  onCheckWithJudge={() => handleCheckWithJudge(turn.turnId)}
+                  isCheckingWithJudge={judgeCheck.turnId === turn.turnId}
+                  judgeCheckError={judgeCheck.error?.turnId === turn.turnId ? judgeCheck.error.message : null}
                 />
               </div>
             ))
@@ -703,15 +734,16 @@ export default function Workspace({
               )}
               {models.map(m => {
                 const isSelected = activeMode === 'single' ? singleModelOverride === m.id : selectedModelIds.includes(m.id);
+                const canAnswer = modelAvailability[m.id] !== false;
                 return (
                   <button
                     key={m.id}
                     className={`model-pill ${isSelected ? 'selected' : ''}`}
                     onClick={() => handleToggleModel(m.id)}
-                    title={`${m.name} (${m.provider}) - ${m.description}`}
+                    title={shortModelReason(m, reasonContext)}
                     aria-pressed={isSelected}
                   >
-                    <span className="status-dot active"></span>
+                    <span className={`status-dot ${canAnswer ? 'active' : 'idle'}`} aria-label={canAnswer ? 'Can answer' : 'No API key'}></span>
                     <span className="pill-avatar">{m.avatar}</span>
                     <span className="pill-name">{m.name}</span>
                     {isSelected ? <CheckSquare size={13} className="text-cyan" /> : <Square size={13} className="text-dim" />}
@@ -849,7 +881,7 @@ export default function Workspace({
         .workspace-sidebar {
           width: 280px;
           border-right: 1px solid var(--border-subtle);
-          background: rgba(10, 14, 22, 0.95);
+          background: rgba(var(--surface-rgb, 10, 14, 22), 0.95);
           display: flex;
           flex-direction: column;
           flex-shrink: 0;
@@ -866,7 +898,7 @@ export default function Workspace({
           display: flex;
           align-items: center;
           gap: 0.5rem;
-          background: rgba(0, 0, 0, 0.3);
+          background: rgba(var(--shade-rgb, 0, 0, 0), 0.3);
           border: 1px solid var(--border-light);
           padding: 0.4rem 0.65rem;
           border-radius: var(--radius-sm);
@@ -877,7 +909,7 @@ export default function Workspace({
         .search-input {
           background: transparent;
           border: none;
-          color: #fff;
+          color: var(--text-strong, #fff);
           font-size: 0.8rem;
           outline: none;
           width: 100%;
@@ -915,7 +947,7 @@ export default function Workspace({
           border: 1px solid transparent;
         }
         .conv-item:hover {
-          background: rgba(255, 255, 255, 0.05);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.05);
         }
         .conv-item.active {
           background: rgba(99, 102, 241, 0.15);
@@ -930,7 +962,7 @@ export default function Workspace({
         .conv-title {
           font-size: 0.8rem;
           font-weight: 600;
-          color: #fff;
+          color: var(--text-strong, #fff);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -990,7 +1022,7 @@ export default function Workspace({
           font-weight: 600;
         }
         .mode-chip {
-          background: rgba(255, 255, 255, 0.05);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.05);
           border: 1px solid var(--border-subtle);
           color: var(--text-secondary);
           font-family: var(--font-display);
@@ -1002,13 +1034,13 @@ export default function Workspace({
           transition: all 0.2s ease;
         }
         .mode-chip:hover {
-          color: #fff;
-          background: rgba(255, 255, 255, 0.1);
+          color: var(--text-strong, #fff);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.1);
         }
         .mode-chip.active {
           background: rgba(6, 182, 212, 0.15);
           border-color: rgba(6, 182, 212, 0.4);
-          color: #67e8f9;
+          color: var(--tint-cyan, #67e8f9);
         }
         .active-panel-btn {
           background: rgba(6, 182, 212, 0.15) !important;
@@ -1059,7 +1091,7 @@ export default function Workspace({
         .quick-btn {
           background: rgba(99, 102, 241, 0.15);
           border: 1px solid rgba(99, 102, 241, 0.35);
-          color: #c7d2fe;
+          color: var(--tint-indigo, #c7d2fe);
           padding: 0.5rem 1rem;
           border-radius: var(--radius-md);
           font-size: 0.825rem;
@@ -1089,11 +1121,11 @@ export default function Workspace({
         }
         .msg-author {
           font-weight: 700;
-          color: #a5b4fc;
+          color: var(--tint-indigo, #a5b4fc);
         }
         .msg-text {
           font-size: 0.95rem;
-          color: #fff;
+          color: var(--text-strong, #fff);
           line-height: 1.5;
         }
         .refined-tag-box {
@@ -1102,7 +1134,7 @@ export default function Workspace({
           gap: 0.35rem;
           margin-top: 0.6rem;
           font-size: 0.72rem;
-          color: #67e8f9;
+          color: var(--tint-cyan, #67e8f9);
           background: rgba(6, 182, 212, 0.1);
           padding: 0.15rem 0.5rem;
           border-radius: var(--radius-full);
@@ -1116,7 +1148,7 @@ export default function Workspace({
           background: rgba(6, 182, 212, 0.05);
         }
         .generating-indicator strong {
-          color: #fff;
+          color: var(--text-strong, #fff);
           font-size: 0.9rem;
         }
         .generating-indicator p {
@@ -1154,7 +1186,7 @@ export default function Workspace({
           display: inline-flex;
           align-items: center;
           gap: 0.4rem;
-          background: rgba(255, 255, 255, 0.04);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.04);
           border: 1px solid var(--border-subtle);
           padding: 0.25rem 0.65rem;
           border-radius: var(--radius-full);
@@ -1166,13 +1198,13 @@ export default function Workspace({
           white-space: nowrap;
         }
         .model-pill:hover {
-          color: #fff;
-          background: rgba(255, 255, 255, 0.08);
+          color: var(--text-strong, #fff);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.08);
         }
         .model-pill.selected {
           background: rgba(99, 102, 241, 0.15);
           border-color: rgba(99, 102, 241, 0.4);
-          color: #fff;
+          color: var(--text-strong, #fff);
         }
         .attached-doc-chip {
           display: inline-flex;
@@ -1183,7 +1215,7 @@ export default function Workspace({
           padding: 0.25rem 0.65rem;
           border-radius: var(--radius-sm);
           font-size: 0.75rem;
-          color: #67e8f9;
+          color: var(--tint-cyan, #67e8f9);
           width: fit-content;
         }
         .composer-input-row {
@@ -1195,7 +1227,7 @@ export default function Workspace({
           flex: 1;
           background: transparent;
           border: none;
-          color: #fff;
+          color: var(--text-strong, #fff);
           font-family: var(--font-sans);
           font-size: 0.9rem;
           line-height: 1.5;

@@ -104,7 +104,7 @@ export default function WorkflowPipeline({ currentStage, onStageClick }) {
           opacity: 0.45;
         }
         .stage-item.waiting .stage-icon-wrap {
-          background: rgba(255, 255, 255, 0.06);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.06);
           color: var(--text-dim);
           border: 1px solid var(--border-subtle);
         }
@@ -121,7 +121,7 @@ export default function WorkflowPipeline({ currentStage, onStageClick }) {
           transform: scale(1.1);
         }
         .stage-item.active .stage-label {
-          color: #fff;
+          color: var(--text-strong, #fff);
           font-weight: 700;
         }
         .stage-item.completed {
@@ -144,7 +144,7 @@ export default function WorkflowPipeline({ currentStage, onStageClick }) {
         .stage-connector {
           flex: 1;
           height: 2px;
-          background: rgba(255, 255, 255, 0.08);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.08);
           min-width: 14px;
           transition: all 0.3s ease;
         }

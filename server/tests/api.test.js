@@ -56,6 +56,11 @@ describe('AI Hive Mind — Comprehensive Backend API Test Suite', () => {
     assert.ok(data.models.length > 0);
     assert.ok(data.criticWeights);
     assert.strictEqual(typeof data.criticWeights.correctness, 'number');
+
+    // Availability per model, kept separate from the model objects; this test server has no hosted keys
+    for (const m of data.models) assert.strictEqual(typeof data.availability[m.id], 'boolean');
+    assert.strictEqual(data.availability['gpt-4o'], false);
+    assert.ok(data.models.every(m => !('availability' in m) && !('isAvailable' in m)));
   });
 
   it('POST /api/models/update updates models and weights in memory', async () => {
@@ -430,6 +435,30 @@ describe('AI Hive Mind — Comprehensive Backend API Test Suite', () => {
     assert.strictEqual(res.status, 200);
     const data = await res.json();
     assert.strictEqual(data.turn.selectedModelId, 'synthesis');
+  });
+
+  it('POST /api/conversations/:id/turns/:turnId/evaluate re-grades the saved answers', async () => {
+    const evaluate = (turnId, body) => fetch(`${BASE_URL}/conversations/${testConvId}/turns/${turnId}/evaluate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    // This test server has no hosted API keys (at most an unreachable local Ollama URL), so the judge cannot
+    // grade; the result says so instead of pretending
+    const res = await evaluate(testTurnId, { enableLLMJudge: true });
+    assert.strictEqual(res.status, 200);
+    const { turn } = await res.json();
+    assert.strictEqual(turn.criticEvaluation.evaluationStatus, 'degraded');
+    assert.ok(turn.criticEvaluation.evaluationMetadata.judge.requested);
+    assert.ok(turn.reevaluatedAt);
+
+    // The new evaluation is saved on the turn
+    const saved = await (await fetch(`${BASE_URL}/conversations/${testConvId}`)).json();
+    assert.strictEqual(saved.turns.find(t => t.turnId === testTurnId).reevaluatedAt, turn.reevaluatedAt);
+
+    assert.strictEqual((await evaluate('non-existent-turn-id', { enableLLMJudge: true })).status, 404);
+    assert.strictEqual((await evaluate(testTurnId, { enableLLMJudge: true, judgeModel: 'not-a-model' })).status, 400);
   });
 
   it('PUT /api/conversations/:id/title updates conversation title', async () => {

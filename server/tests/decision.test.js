@@ -124,7 +124,12 @@ describe('Decision Model + Single AI Mode', () => {
 
     const conv = memoryService.getConversation(out.conversation.id);
     assert.strictEqual(conv.turns.length, 1, 'failure is recorded for diagnostics');
-    assert.deepStrictEqual(memoryService.getActiveHistoryContext(out.conversation.id), [], 'but kept out of history');
+    // The question stays in history so "try again" works; the error text is never passed on as an answer
+    const history = memoryService.getActiveHistoryContext(out.conversation.id);
+    assert.deepStrictEqual(history.map(m => m.role), ['user', 'assistant']);
+    assert.match(history[0].content, /Explain recursion/);
+    assert.ok(!history[1].content.includes('[Error]'));
+    assert.match(history[1].content, /No answer was produced/);
   });
 
   it('8. simulated output requires explicit opt-in and stays labelled', async () => {
@@ -192,16 +197,27 @@ describe('Decision Model + Single AI Mode', () => {
     assert.strictEqual(llm.calls[0].documentContext, 'Quarterly notes: revenue grew.');
   });
 
-  it('15. LLM judge is off by default and skipped when its provider has no key', async () => {
+  it('15. LLM judge is off by default, uses a model that has a key, and never calls one without', async () => {
     const llm = mockLlm({ available: ['gpt-4o'] });
     const off = await executeDecision(request({ prompt: 'Explain recursion', modelId: 'gpt-4o' }), deps(llm));
     assert.strictEqual(off.criticEvaluation.evaluationStatus, 'deterministic_only');
     assert.strictEqual(llm.calls.length, 1, 'no judge call');
 
+    // Gemini (the preferred judge) has no key here, so the judge falls back to gpt-4o
     const on = await executeDecision(request({ prompt: 'Explain recursion', modelId: 'gpt-4o', options: { enableLLMJudge: true } }), deps(llm));
-    assert.strictEqual(on.criticEvaluation.evaluationMetadata.judge.available, false);
-    assert.strictEqual(on.criticEvaluation.evaluationStatus, 'degraded');
-    assert.strictEqual(llm.calls.length, 2, 'judge without credentials is never called');
+    assert.strictEqual(on.criticEvaluation.evaluationMetadata.judge.model, 'gpt-4o');
+    assert.strictEqual(on.criticEvaluation.evaluationMetadata.judge.available, true);
+    // The mock answers in prose, not judge JSON, so the judge retries once before giving up
+    const judgeCalls = llm.calls.slice(2);
+    assert.ok(judgeCalls.length >= 1 && judgeCalls.every(c => c.modelId === 'gpt-4o'));
+    const callsSoFar = llm.calls.length;
+
+    // A named judge without credentials is reported unavailable and never called
+    const named = await evaluateResponses('Explain recursion', '', [{ modelId: 'gpt-4o', text: 'Recursion is a function calling itself until a base case.', status: 'success', isLive: true }], {},
+      { llmService: llm, options: { enableLLMJudge: true, judgeModel: 'claude-opus-5-5' } });
+    assert.strictEqual(named.evaluationMetadata.judge.available, false);
+    assert.strictEqual(named.evaluationStatus, 'degraded');
+    assert.strictEqual(llm.calls.length, callsSoFar, 'judge without credentials is never called');
   });
 
   it('16. API keys never appear in responses or error messages', async () => {
@@ -292,5 +308,47 @@ describe('Observed performance in model choice', () => {
   it('availability still comes before performance', () => {
     const strongB = { b: { avgScore: 99, count: 10 } };
     assert.strictEqual(recommendModels(models, analysis, id => id === 'a', strongB).topRecommendation.modelId, 'a');
+  });
+});
+
+describe('Conversation memory', () => {
+  const ok = (modelId, text) => ({ modelId, text, status: 'success', isLive: true });
+  const failed = modelId => ({ modelId, text: `[Error from ${modelId}: Could not reach the provider.]`, status: 'error', errorType: 'network' });
+
+  it('keeps a failed question in history so "rerun it" knows what to rerun', () => {
+    const conv = memoryService.createConversation('memory test');
+    memoryService.addTurn(conv.id, { userPrompt: 'explain about data structures', responses: [failed('gemini-2-5-flash'), failed('llama-3-3-70b')] });
+    const history = memoryService.getActiveHistoryContext(conv.id);
+    assert.deepStrictEqual(history.map(m => m.role), ['user', 'assistant']);
+    assert.match(history[0].content, /data structures/);
+    assert.ok(!/Error from|Could not reach/.test(history[1].content), 'error text is not passed on as an answer');
+  });
+
+  it("uses another model's answer when the chosen one failed", () => {
+    const conv = memoryService.createConversation('memory test');
+    memoryService.addTurn(conv.id, {
+      userPrompt: 'What is a stack?',
+      responses: [failed('gemini-2-5-flash'), ok('llama-3-3-70b', 'A stack is a last-in, first-out collection.')],
+      selectedModelId: 'gemini-2-5-flash'
+    });
+    const history = memoryService.getActiveHistoryContext(conv.id);
+    assert.strictEqual(history[1].content, 'A stack is a last-in, first-out collection.');
+  });
+
+  it('always alternates user and assistant messages', () => {
+    const conv = memoryService.createConversation('memory test');
+    memoryService.addTurn(conv.id, { userPrompt: 'first', responses: [failed('gemini-2-5-flash')] });
+    memoryService.addTurn(conv.id, { userPrompt: 'second', responses: [ok('gemini-2-5-flash', 'Second answer.')] });
+    memoryService.addTurn(conv.id, { userPrompt: 'third', responses: [{ modelId: 'sarvam-105b', text: '', status: 'success' }] });
+    const roles = memoryService.getActiveHistoryContext(conv.id).map(m => m.role);
+    assert.deepStrictEqual(roles, ['user', 'assistant', 'user', 'assistant', 'user', 'assistant']);
+  });
+
+  it('reports an empty reply from a provider as an error, not an answer', async () => {
+    const service = new LLMService(FAKE_KEYS);
+    service.callOpenAI = async () => ({ text: '   ', status: 'success' });
+    const resp = await service.generateSingle({ id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI' }, 'hi');
+    assert.strictEqual(resp.status, 'error');
+    assert.match(resp.errorMessage, /empty answer/);
   });
 });

@@ -499,7 +499,7 @@ export default function SettingsModal({
           padding: 0.6rem 1.5rem;
           gap: 0.5rem;
           border-bottom: 1px solid var(--border-subtle);
-          background: rgba(0, 0, 0, 0.2);
+          background: rgba(var(--shade-rgb, 0, 0, 0), 0.2);
         }
         .tab-btn {
           display: flex;
@@ -517,11 +517,11 @@ export default function SettingsModal({
           transition: all 0.2s ease;
         }
         .tab-btn:hover {
-          color: #fff;
-          background: rgba(255, 255, 255, 0.05);
+          color: var(--text-strong, #fff);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.05);
         }
         .tab-btn.active {
-          color: #fff;
+          color: var(--text-strong, #fff);
           background: rgba(99, 102, 241, 0.15);
           border-color: rgba(99, 102, 241, 0.3);
         }
@@ -539,7 +539,7 @@ export default function SettingsModal({
           border: 1px solid rgba(16, 185, 129, 0.25);
           border-radius: var(--radius-md);
           font-size: 0.8rem;
-          color: #a7f3d0;
+          color: var(--tint-emerald, #a7f3d0);
           margin-bottom: 1.25rem;
         }
         .keys-grid {
@@ -559,7 +559,7 @@ export default function SettingsModal({
           justify-content: space-between;
           font-size: 0.875rem;
           font-weight: 700;
-          color: #fff;
+          color: var(--text-strong, #fff);
         }
         .key-desc {
           font-size: 0.75rem;
@@ -571,10 +571,10 @@ export default function SettingsModal({
         }
         .key-input {
           flex: 1;
-          background: rgba(0, 0, 0, 0.4);
+          background: rgba(var(--shade-rgb, 0, 0, 0), 0.4);
           border: 1px solid var(--border-light);
           border-radius: var(--radius-sm);
-          color: #fff;
+          color: var(--text-strong, #fff);
           padding: 0.45rem 0.75rem;
           font-size: 0.8rem;
           font-family: var(--font-mono);
@@ -647,7 +647,7 @@ export default function SettingsModal({
           display: flex;
           justify-content: space-between;
           font-size: 0.8rem;
-          color: #fff;
+          color: var(--text-strong, #fff);
           font-weight: 600;
         }
         .weight-percent {
@@ -661,7 +661,7 @@ export default function SettingsModal({
           justify-content: flex-end;
           gap: 0.75rem;
           border-top: 1px solid var(--border-subtle);
-          background: rgba(0, 0, 0, 0.25);
+          background: rgba(var(--shade-rgb, 0, 0, 0), 0.25);
         }
         .save-toast {
           display: flex;

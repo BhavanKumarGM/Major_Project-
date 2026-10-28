@@ -77,7 +77,7 @@ export default function BranchViewer({ conversation, onSelectBranch }) {
           padding: 1.5rem;
           margin-bottom: 1.5rem;
           border-radius: var(--radius-lg);
-          background: rgba(13, 18, 28, 0.9);
+          background: rgba(var(--surface-rgb, 13, 18, 28), 0.9);
         }
         .branch-viewer-empty {
           padding: 3rem 1.5rem;
@@ -123,7 +123,7 @@ export default function BranchViewer({ conversation, onSelectBranch }) {
           display: flex;
           align-items: center;
           gap: 0.6rem;
-          background: rgba(255, 255, 255, 0.04);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.04);
           padding: 0.5rem 0.85rem;
           border-radius: var(--radius-md);
           border: 1px solid var(--border-subtle);
@@ -139,7 +139,7 @@ export default function BranchViewer({ conversation, onSelectBranch }) {
         }
         .turn-prompt-text {
           font-size: 0.85rem;
-          color: #fff;
+          color: var(--text-strong, #fff);
           font-weight: 500;
         }
         .candidate-branches-row {
@@ -167,18 +167,18 @@ export default function BranchViewer({ conversation, onSelectBranch }) {
           cursor: pointer;
           transition: all 0.2s ease;
           border: 1px solid var(--border-subtle);
-          background: rgba(255, 255, 255, 0.04);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.04);
           color: var(--text-secondary);
         }
         .branch-chip:hover {
-          background: rgba(255, 255, 255, 0.08);
-          color: #fff;
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.08);
+          color: var(--text-strong, #fff);
           transform: translateY(-1px);
         }
         .branch-chip.active-branch {
           background: rgba(16, 185, 129, 0.15);
           border-color: rgba(16, 185, 129, 0.5);
-          color: #6ee7b7;
+          color: var(--tint-emerald, #6ee7b7);
           box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
         }
         .active-tag {

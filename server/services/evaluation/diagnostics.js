@@ -12,6 +12,7 @@ export const ISSUE_CATEGORIES = [
   'format_violation',
   'incomplete_response',
   'code_validation_failure',
+  'off_topic',
   'insufficient_evidence',
   'provider_error',
   'evaluation_error'

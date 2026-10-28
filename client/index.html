@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%236366f1'><path d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/></svg>" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Apply the saved theme before first paint so light mode does not flash dark
+      try { if (localStorage.getItem('hiveTheme') === 'light') document.documentElement.dataset.theme = 'light'; } catch (e) {}
+    </script>
     <title>AI HIVE MIND | One Question. Multiple Minds. One Better Answer.</title>
     <meta name="description" content="AI Hive Mind: Multi-LLM assistant with prompt analysis, refinement, intelligent model recommendation, parallel generation, and Critic AI evaluation." />
     <link rel="preconnect" href="https://fonts.googleapis.com">

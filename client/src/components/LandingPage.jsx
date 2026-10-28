@@ -158,7 +158,7 @@ export default function LandingPage({ onStartWorkspace, onSelectSamplePrompt }) 
 
         <div className="feature-grid">
           <div className="feature-card glass-card">
-            <div className="feature-icon-wrap" style={{ color: '#818cf8', background: 'rgba(99, 102, 241, 0.12)' }}>
+            <div className="feature-icon-wrap" style={{ color: 'var(--tint-indigo, #818cf8)', background: 'rgba(99, 102, 241, 0.12)' }}>
               <Sparkles size={24} />
             </div>
             <h3 className="feature-card-title">Prompt Refinement & Breakdown</h3>
@@ -264,10 +264,10 @@ export default function LandingPage({ onStartWorkspace, onSelectSamplePrompt }) 
           border-radius: var(--radius-full);
           font-size: 0.8rem;
           font-weight: 600;
-          color: #a5b4fc;
+          color: var(--tint-indigo, #a5b4fc);
         }
         .hero-sparkle {
-          color: #818cf8;
+          color: var(--tint-indigo, #818cf8);
           animation: pulse 2s infinite;
         }
         .hero-title {
@@ -311,7 +311,7 @@ export default function LandingPage({ onStartWorkspace, onSelectSamplePrompt }) 
           display: inline-flex;
           align-items: center;
           gap: 0.45rem;
-          background: rgba(255, 255, 255, 0.04);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.04);
           border: 1px solid var(--border-light);
           padding: 0.4rem 0.85rem;
           border-radius: var(--radius-full);
@@ -321,7 +321,7 @@ export default function LandingPage({ onStartWorkspace, onSelectSamplePrompt }) 
           transition: all 0.2s ease;
         }
         .sample-chip:hover {
-          color: #fff;
+          color: var(--text-strong, #fff);
           background: rgba(99, 102, 241, 0.2);
           border-color: rgba(99, 102, 241, 0.4);
           transform: translateY(-1px);
@@ -359,7 +359,7 @@ export default function LandingPage({ onStartWorkspace, onSelectSamplePrompt }) 
           gap: 1rem;
         }
         .pipeline-node {
-          background: rgba(13, 18, 28, 0.9);
+          background: rgba(var(--surface-rgb, 13, 18, 28), 0.9);
           border: 1px solid var(--border-light);
           border-radius: var(--radius-md);
           padding: 1.25rem 1rem;
@@ -380,15 +380,15 @@ export default function LandingPage({ onStartWorkspace, onSelectSamplePrompt }) 
           margin-bottom: 0.75rem;
           color: white;
         }
-        .bg-indigo { background: linear-gradient(135deg, #6366f1, #818cf8); }
+        .bg-indigo { background: linear-gradient(135deg, #6366f1, var(--tint-indigo, #818cf8)); }
         .bg-cyan { background: linear-gradient(135deg, #0891b2, #06b6d4); }
-        .bg-purple { background: linear-gradient(135deg, #9333ea, #c084fc); }
-        .bg-emerald { background: linear-gradient(135deg, #059669, #34d399); }
+        .bg-purple { background: linear-gradient(135deg, #9333ea, var(--tint-purple, #c084fc)); }
+        .bg-emerald { background: linear-gradient(135deg, #059669, var(--tint-emerald, #34d399)); }
         .node-title {
           font-family: var(--font-display);
           font-weight: 700;
           font-size: 0.9rem;
-          color: #fff;
+          color: var(--text-strong, #fff);
           margin-bottom: 0.25rem;
         }
         .node-desc {
@@ -412,7 +412,7 @@ export default function LandingPage({ onStartWorkspace, onSelectSamplePrompt }) 
           display: flex;
           align-items: center;
           gap: 0.5rem;
-          background: rgba(255, 255, 255, 0.05);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.05);
           border: 1px solid var(--border-subtle);
           padding: 0.35rem 0.65rem;
           border-radius: var(--radius-sm);

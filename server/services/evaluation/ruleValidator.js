@@ -6,6 +6,154 @@
 
 import { DEFAULT_CRITIC_WEIGHTS } from '../../config/models.js';
 
+const REFUSAL_PATTERN = /^(?:(?:i'?m|i am) sorry|sorry|i apologi[sz]e|unfortunately)?[^.!?]{0,60}?\b(?:i (?:can(?:'|’)?t|cannot|can not|am unable to|am not able to|won(?:'|’)?t|will not)|i'?m (?:unable|not able) to)\s+(?:help|assist|provide|do|comply|fulfill|answer|support|complete|write)\b/i;
+
+const NUMBER_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, twelve: 12, fifteen: 15, twenty: 20 };
+const LIST_NOUNS = 'bullet points?|bullets|items|points|reasons|benefits|advantages|disadvantages|examples|tips|ways|steps|ideas|things|facts|questions|options|features|names|tools|methods|strategies|differences|uses';
+const ITEM_COUNT_RE = new RegExp(`\\b(?:exactly|only|just|top|list|give(?: me)?|name|provide|write|suggest)\\s+(\\d{1,2}|${Object.keys(NUMBER_WORDS).join('|')})\\s+(?:[a-z-]+\\s+){0,2}?(${LIST_NOUNS})\\b`, 'gi');
+
+// Returns { count, noun } only when the prompt states one unambiguous item count
+function parseItemCount(prompt) {
+  const matches = [...prompt.matchAll(ITEM_COUNT_RE)];
+  if (matches.length !== 1) return null;
+  const raw = matches[0][1].toLowerCase();
+  const count = NUMBER_WORDS[raw] || parseInt(raw, 10);
+  return count >= 1 && count <= 30 ? { count, noun: matches[0][2].toLowerCase() } : null;
+}
+
+// Counts list items at the outermost indentation level, outside code blocks
+function countTopLevelListItems(text) {
+  const indents = text.replace(/```[\s\S]*?```/g, '')
+    .split('\n')
+    .map(line => line.match(/^(\s*)(?:[-*•]|\d{1,2}[.)])\s+\S/))
+    .filter(Boolean)
+    .map(m => m[1].replace(/\t/g, '    ').length);
+  if (indents.length === 0) return 0;
+  const top = Math.min(...indents);
+  return indents.filter(i => i === top).length;
+}
+
+// Code counts as requested when the prompt asks to produce or change code, not when it merely mentions coding
+// ("tips for learning to code" is not a request for code)
+const CODE_NOUN = '(?:code|function|program|script|class|method|implementation|query|regex|snippet|algorithm)';
+const CODE_REQUEST_RE = new RegExp(
+  `\\b(?:write|implement|create|build|generate|give|show|provide|fix|debug|refactor|optimi[sz]e|convert|complete)\\b[^.?!]{0,40}(?<!\\b(?:learn|learning|start|starting|begin|beginning) to )\\b${CODE_NOUN}s?\\b` +
+  `|\\b${CODE_NOUN}s?\\s+(?:to|for|that)\\b|\\bc program\\b|\\bpython script\\b`, 'i');
+
+export function isCodeRequested(prompt = '') {
+  return CODE_REQUEST_RE.test(prompt);
+}
+
+const STOP_WORDS = new Set(('about above after again also answer because before being below between both could does doing down during each explain few from further give have having here how into just like list make many more most much need only other over please provide same should show some such tell than that their them then there these they this those through very want what when where which while with would write your describe example examples using used use help works work under words word within less least exactly bullet bullets points point sentence sentences lines line paragraph paragraphs brief briefly short detail details detailed simple simply step steps tips tip better best good ways ideas things important main basic').split(' '));
+
+function contentTerms(prompt) {
+  const words = (prompt.toLowerCase().match(/[a-z]{4,}/g) || []).filter(w => !STOP_WORDS.has(w));
+  return [...new Set(words)];
+}
+
+// Loose stem match so "photosynthesis" matches "photosynthetic" and "plants" matches "plant"
+function sameStem(a, b) {
+  const n = Math.min(5, a.length, b.length);
+  return n >= 4 && a.slice(0, n) === b.slice(0, n);
+}
+
+const SMALL_NUMBERS = { one: 1, a: 1, single: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
+const toCount = s => SMALL_NUMBERS[s] || parseInt(s, 10);
+
+// Unicode ranges for languages an answer can be asked to use
+const SCRIPTS = {
+  hindi: /[ऀ-ॿ]/g, marathi: /[ऀ-ॿ]/g, nepali: /[ऀ-ॿ]/g, sanskrit: /[ऀ-ॿ]/g,
+  bengali: /[ঀ-৿]/g, punjabi: /[਀-੿]/g, gujarati: /[઀-૿]/g, odia: /[଀-୿]/g,
+  tamil: /[஀-௿]/g, telugu: /[ఀ-౿]/g, kannada: /[ಀ-೿]/g, malayalam: /[ഀ-ൿ]/g,
+  urdu: /[؀-ۿ]/g, arabic: /[؀-ۿ]/g, russian: /[Ѐ-ӿ]/g, greek: /[Ͱ-Ͽ]/g,
+  chinese: /[一-鿿]/g, japanese: /[぀-ヿ一-鿿]/g, korean: /[가-힯]/g
+};
+// Only phrasing that asks for the reply itself in a language ("explain X in Kannada", "translate this into Hindi"),
+// not questions about a language ("what does namaste mean in Hindi?")
+const LANGUAGE_REQUEST_RE = new RegExp(
+  `\\b(?:respond|reply|answer|write|explain|describe|tell me|summari[sz]e|translate|list|give)\\b[^.?!]{0,80}?\\b(?:in|into|to)\\s+(${Object.keys(SCRIPTS).join('|')})\\b`);
+
+function finding(id, ok, okText, failText, evidence, correction) {
+  return {
+    id: `rule-${id}`,
+    rule: id.replace(/-/g, '_'),
+    status: ok ? 'pass' : 'fail',
+    severity: ok ? 'low' : 'high',
+    category: 'format_violation',
+    description: ok ? okText : failText,
+    evidence,
+    likelySource: 'decision_model',
+    recommendedCorrection: ok ? undefined : correction
+  };
+}
+
+function checkRequestedFormats(promptLower, text) {
+  const results = [];
+  const prose = text.replace(/```[\s\S]*?```/g, ' ');
+
+  if (/\b(in|as|into|using|with) (a |an )?(markdown |comparison )?table\b|\btabular\b|\btable format\b/.test(promptLower)) {
+    const hasTable = /^\s*\|.*\|\s*$/m.test(prose) && /^\s*\|?\s*:?-{3,}/m.test(prose) || /<table[\s>]/i.test(prose);
+    results.push(finding('table-format', hasTable, 'Provided the requested table.',
+      'Prompt asked for a table, but the response has none.', hasTable ? 'Table found.' : 'No markdown table found.', 'Present the answer as a markdown table.'));
+  }
+
+  if (/\bnumbered (list|steps|points)\b/.test(promptLower)) {
+    const ok = /^\s*\d{1,2}[.)]\s+\S/m.test(prose);
+    results.push(finding('numbered-list', ok, 'Provided the requested numbered list.',
+      'Prompt asked for a numbered list, but the response has none.', ok ? 'Numbered items found.' : 'No numbered items found.', 'Use a numbered list.'));
+  } else if (/\b(bullet(ed)? (points?|list)|as bullets|in bullets)\b/.test(promptLower)) {
+    const ok = /^\s*[-*•]\s+\S/m.test(prose);
+    results.push(finding('bullet-list', ok, 'Provided the requested bullet points.',
+      'Prompt asked for bullet points, but the response has none.', ok ? 'Bullets found.' : 'No bullet items found.', 'Use bullet points.'));
+  }
+
+  const sentenceReq = promptLower.match(/\b(?:in|using|with|within|at most)\s+(one|a single|single|two|three|four|five|\d)\s+sentences?\b|\b(one|single)[- ]sentence\b/);
+  if (sentenceReq) {
+    const limit = toCount((sentenceReq[1] || sentenceReq[2]).replace('a single', 'single'));
+    // Abbreviations and decimals would otherwise split sentences
+    const cleaned = prose.replace(/\b(e\.g|i\.e|etc|vs|dr|mr|mrs|ms|st|no)\./gi, '$1').replace(/(\d)\.(\d)/g, '$1$2');
+    const count = (cleaned.match(/[^.!?]+[.!?]+(\s|$)/g) || []).length || (cleaned.trim() ? 1 : 0);
+    const ok = count <= limit;
+    results.push(finding('sentence-count', ok, `Kept to ${limit} sentence${limit > 1 ? 's' : ''}.`,
+      `Prompt asked for ${limit} sentence${limit > 1 ? 's' : ''}, but the response has ${count}.`, `${count} sentences.`, `Answer in ${limit} sentence${limit > 1 ? 's' : ''}.`));
+  }
+
+  const paragraphReq = promptLower.match(/\b(?:in|using|with|within|at most)\s+(one|a single|single|two|three|four|five|\d)\s+paragraphs?\b|\b(one|single)[- ]paragraph\b/);
+  if (paragraphReq) {
+    const limit = toCount((paragraphReq[1] || paragraphReq[2]).replace('a single', 'single'));
+    const count = prose.split(/\n\s*\n/).filter(p => /[\p{L}\p{N}]/u.test(p) && !/^\s*#/.test(p)).length;
+    const ok = count <= limit;
+    results.push(finding('paragraph-count', ok, `Kept to ${limit} paragraph${limit > 1 ? 's' : ''}.`,
+      `Prompt asked for ${limit} paragraph${limit > 1 ? 's' : ''}, but the response has ${count}.`, `${count} paragraphs.`, `Answer in ${limit} paragraph${limit > 1 ? 's' : ''}.`));
+  }
+
+  if (/\b(in one word|one[- ]word (answer|reply|response)|single[- ]word (answer|reply|response)|answer in a word)\b/.test(promptLower)) {
+    const words = prose.split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length;
+    const ok = words <= 3;
+    results.push(finding('one-word', ok, 'Answered in a word.', `Prompt asked for a one-word answer, but the response has ${words} words.`,
+      `${words} words.`, 'Reply with a single word.'));
+  }
+
+  const lang = promptLower.match(LANGUAGE_REQUEST_RE)?.[1];
+  if (lang) {
+    const letters = (prose.match(/\p{L}/gu) || []).length;
+    const inScript = (prose.match(SCRIPTS[lang]) || []).length;
+    const share = letters ? inScript / letters : 0;
+    const ok = share >= 0.4;
+    const name = lang[0].toUpperCase() + lang.slice(1);
+    results.push(finding('response-language', ok, `Answered in ${name}.`,
+      `Prompt asked for an answer in ${name}, but the response is mostly in another script.`,
+      `${Math.round(share * 100)}% of letters are in the ${name} script.`, `Write the answer in ${name}.`));
+  }
+
+  return results;
+}
+
+function parseWordLimit(prompt) {
+  const m = prompt.match(/\b(?:in|under|within|at most|no more than|max(?:imum)?(?: of)?|less than|fewer than|up to)\s+(\d{1,4})\s+words?\b/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+
 /**
  * Validates and normalizes evaluation weights.
  * Safe fallback to DEFAULT_CRITIC_WEIGHTS if invalid or non-positive.
@@ -69,6 +217,9 @@ export function runDeterministicChecks(candidate, promptContext = {}) {
   const originalPrompt = (promptContext.originalPrompt || '').trim();
   const refinedPrompt = (promptContext.refinedPrompt || '').trim();
   const fullPromptText = `${originalPrompt} ${refinedPrompt}`.toLowerCase();
+  // What the user actually asked for. Auto-added refinement suggestions ("complexity where relevant") are not hard requirements;
+  // when the user adopts a refined prompt, it arrives here as originalPrompt.
+  const userPromptText = originalPrompt.toLowerCase();
   const constraints = promptContext.constraints || [];
 
   const text = candidate.text != null ? String(candidate.text).trim() : '';
@@ -159,7 +310,8 @@ export function runDeterministicChecks(candidate, promptContext = {}) {
   }
 
   // 4. Output Format Checks: Code blocks when code explicitly requested
-  const requiresCode = /\b(code|function|program|script|c program|python script|implementation)\b/i.test(fullPromptText);
+  // For coding-category prompts the coding task validator checks code blocks itself; checking here too would double-count
+  const requiresCode = !promptContext.codeCheckedByTask && isCodeRequested(userPromptText);
   if (requiresCode) {
     const hasCodeBlock = /```[a-z0-9_-]*[\s\S]*?```/i.test(text);
     if (hasCodeBlock) {
@@ -246,7 +398,7 @@ export function runDeterministicChecks(candidate, promptContext = {}) {
   ];
 
   for (const sec of requestedSections) {
-    if (sec.pattern.test(fullPromptText)) {
+    if (sec.pattern.test(userPromptText)) {
       const presentInResponse = sec.pattern.test(textLower) || 
         (/\bcomplexity\b/i.test(textLower) && sec.name === 'Complexity Analysis') ||
         (/\b(input:|output:|example:)/i.test(textLower) && sec.name === 'Sample Test Cases / Usage');
@@ -278,7 +430,90 @@ export function runDeterministicChecks(candidate, promptContext = {}) {
     }
   }
 
-  // 7. Incomplete generation check (unclosed code fences or abrupt cut-off)
+  // 7. Refusal instead of an answer (short replies only, so answers that mention a limitation are not caught)
+  if (text.length < 400 && REFUSAL_PATTERN.test(text)) {
+    findings.push({
+      id: 'rule-refusal',
+      rule: 'answers_the_prompt',
+      status: 'fail',
+      severity: 'high',
+      category: 'instruction_violation',
+      description: 'Candidate declined to answer instead of addressing the prompt.',
+      evidence: text.substring(0, 150),
+      likelySource: 'decision_model',
+      recommendedCorrection: 'Answer the request, or explain specifically what is missing to do so.'
+    });
+  }
+
+  // 8. Explicit item count ("exactly 3 bullet points", "list 5 tips") and word limits ("under 50 words").
+  // Uses the original prompt: refinement adds its own "Requirements:" bullets.
+  const itemLimit = parseItemCount(originalPrompt);
+  if (itemLimit) {
+    const items = countTopLevelListItems(text);
+    if (items > 0) {
+      const ok = items === itemLimit.count;
+      findings.push({
+        id: 'rule-item-count',
+        rule: 'requested_item_count',
+        status: ok ? 'pass' : 'fail',
+        severity: ok ? 'low' : 'high',
+        category: 'instruction_violation',
+        description: ok
+          ? `Provided the requested ${itemLimit.count} ${itemLimit.noun}.`
+          : `Prompt asked for ${itemLimit.count} ${itemLimit.noun}, but the response lists ${items}.`,
+        evidence: `${items} top-level list items found.`,
+        likelySource: 'decision_model',
+        recommendedCorrection: ok ? undefined : `Return exactly ${itemLimit.count} ${itemLimit.noun}.`
+      });
+    }
+  }
+
+  const wordLimit = parseWordLimit(originalPrompt);
+  if (wordLimit) {
+    // Any letter or digit counts, so Hindi or Kannada answers are measured too
+    const words = text.replace(/```[\s\S]*?```/g, ' ').split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length;
+    const ok = words <= wordLimit;
+    findings.push({
+      id: 'rule-word-limit',
+      rule: 'word_limit',
+      status: ok ? 'pass' : 'fail',
+      severity: ok ? 'low' : 'high',
+      category: 'instruction_violation',
+      description: ok
+        ? `Stayed within the ${wordLimit}-word limit (${words} words).`
+        : `Prompt set a ${wordLimit}-word limit, but the response has ${words} words.`,
+      evidence: `${words} words (code blocks excluded).`,
+      likelySource: 'decision_model',
+      recommendedCorrection: ok ? undefined : `Shorten the response to at most ${wordLimit} words.`
+    });
+  }
+
+  // 8b. Requested output formats (table, numbered/bulleted list, sentence/paragraph counts, one word)
+  //     and requested response language
+  findings.push(...checkRequestedFormats(userPromptText, text));
+
+  // 9. Relevance: a longer answer that shares no content words with the prompt is likely off-topic.
+  // Only longer answers are judged (short ones may answer without repeating the topic), and only prompts with English content words.
+  const promptTerms = contentTerms(originalPrompt);
+  if (promptTerms.length >= 2 && text.length > 200) {
+    const responseWords = text.toLowerCase().match(/[a-z]{4,}/g) || [];
+    const shared = promptTerms.filter(t => responseWords.some(w => sameStem(t, w)));
+    if (shared.length === 0) {
+      findings.push({
+        id: 'rule-off-topic',
+        rule: 'relevance_to_prompt',
+        status: 'fail',
+        severity: 'high',
+        category: 'off_topic',
+        description: 'Response does not mention any of the main terms in the prompt and may be off-topic.',
+        evidence: `Prompt terms not found: ${promptTerms.slice(0, 6).join(', ')}.`,
+        likelySource: 'decision_model',
+        recommendedCorrection: 'Answer the question that was asked.'
+      });
+    }
+  }
+
+  // 10. Incomplete generation check (unclosed code fences or abrupt cut-off)
   const codeFenceCount = (text.match(/```/g) || []).length;
   if (codeFenceCount % 2 !== 0) {
     findings.push({

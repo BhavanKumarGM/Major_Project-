@@ -460,7 +460,7 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
           border-radius: 9999px;
           font-size: 0.8rem;
           font-weight: 600;
-          color: #fbbf24;
+          color: var(--tint-amber, #fbbf24);
           margin-bottom: 1rem;
         }
         .text-amber { color: #f59e0b; }
@@ -495,7 +495,7 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
         }
         .benchmark-textarea {
           flex: 1;
-          background: rgba(0, 0, 0, 0.4);
+          background: rgba(var(--shade-rgb, 0, 0, 0), 0.4);
           border: 1px solid var(--border-subtle);
           border-radius: var(--radius-md);
           padding: 0.85rem 1rem;
@@ -532,7 +532,7 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
           font-weight: 600;
         }
         .sample-pill {
-          background: rgba(255, 255, 255, 0.05);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.05);
           border: 1px solid var(--border-subtle);
           color: var(--text-secondary);
           padding: 0.3rem 0.65rem;
@@ -544,7 +544,7 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
         .sample-pill:hover, .sample-pill.active {
           background: rgba(99, 102, 241, 0.2);
           border-color: var(--accent-indigo);
-          color: #fff;
+          color: var(--text-strong, #fff);
         }
         .category-tabs-bar {
           margin-bottom: 2rem;
@@ -562,7 +562,7 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
           align-items: center;
           gap: 0.5rem;
           padding: 0.55rem 0.9rem;
-          background: rgba(13, 18, 28, 0.7);
+          background: rgba(var(--surface-rgb, 13, 18, 28), 0.7);
           border: 1px solid var(--border-subtle);
           border-radius: var(--radius-md);
           color: var(--text-secondary);
@@ -572,16 +572,16 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
         }
         .cat-tab-btn:hover {
           border-color: var(--accent-cyan);
-          color: #fff;
+          color: var(--text-strong, #fff);
         }
         .cat-tab-btn.active {
           background: rgba(99, 102, 241, 0.2);
           border-color: var(--accent-indigo);
-          color: #fff;
+          color: var(--text-strong, #fff);
           box-shadow: 0 0 16px rgba(99, 102, 241, 0.25);
         }
         .cat-top-model-pill {
-          background: rgba(255, 255, 255, 0.1);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.1);
           padding: 0.15rem 0.45rem;
           border-radius: 4px;
           font-size: 0.7rem;
@@ -635,7 +635,7 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
         .spotlight-title {
           font-size: 1rem;
           font-weight: 700;
-          color: #fff;
+          color: var(--text-strong, #fff);
           margin-bottom: 0.25rem;
         }
         .spotlight-desc {
@@ -659,7 +659,7 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
         }
         .meter-bar-track {
           height: 6px;
-          background: rgba(255, 255, 255, 0.08);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.08);
           border-radius: 9999px;
           overflow: hidden;
         }
@@ -702,7 +702,7 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
         .dist-bar-wrap {
           flex: 1;
           height: 5px;
-          background: rgba(255, 255, 255, 0.05);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.05);
           border-radius: 9999px;
           overflow: hidden;
         }
@@ -730,7 +730,7 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
           gap: 0.4rem;
           font-size: 0.75rem;
           color: var(--text-secondary);
-          background: rgba(255, 255, 255, 0.03);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.03);
           padding: 0.35rem 0.6rem;
           border-radius: 4px;
         }
@@ -746,7 +746,7 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
           gap: 0.75rem;
         }
         .suite-bm-item {
-          background: rgba(0, 0, 0, 0.25);
+          background: rgba(var(--shade-rgb, 0, 0, 0), 0.25);
           border: 1px solid var(--border-subtle);
           padding: 0.75rem;
           border-radius: var(--radius-sm);
@@ -760,7 +760,7 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
         .bm-name-highlight {
           font-size: 0.82rem;
           font-weight: 700;
-          color: #fff;
+          color: var(--text-strong, #fff);
         }
         .bm-weight-badge {
           background: rgba(99, 102, 241, 0.2);
@@ -807,7 +807,7 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
         .standout-tag {
           font-size: 0.75rem;
           font-weight: 700;
-          color: #fcd34d;
+          color: var(--tint-amber, #fcd34d);
           background: rgba(245, 158, 11, 0.15);
           padding: 0.25rem 0.6rem;
           border-radius: 4px;
@@ -821,7 +821,7 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
         .winner-title-group h2 {
           font-size: 1.7rem;
           font-weight: 800;
-          color: #fff;
+          color: var(--text-strong, #fff);
           margin-bottom: 0.2rem;
         }
         .winner-provider {
@@ -834,7 +834,7 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
         .score-num-big {
           font-size: 2.2rem;
           font-weight: 900;
-          color: #fbbf24;
+          color: var(--tint-amber, #fbbf24);
           line-height: 1;
         }
         .score-label-small {
@@ -847,13 +847,13 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
           display: flex;
           align-items: flex-start;
           gap: 0.6rem;
-          background: rgba(0, 0, 0, 0.35);
+          background: rgba(var(--shade-rgb, 0, 0, 0), 0.35);
           border-left: 3px solid var(--accent-cyan);
           padding: 0.85rem 1rem;
           border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
           font-size: 0.84rem;
           line-height: 1.5;
-          color: #e2e8f0;
+          color: var(--text-strong, #e2e8f0);
           margin-bottom: 1.25rem;
         }
         .metrics-grid {
@@ -878,7 +878,7 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
         .metric-score-display {
           font-size: 1.25rem;
           font-weight: 800;
-          color: #fff;
+          color: var(--text-strong, #fff);
         }
         .metric-unit-text {
           font-size: 0.75rem;
@@ -909,11 +909,11 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
         }
         .leaderboard-table td {
           padding: 0.85rem 0.65rem;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+          border-bottom: 1px solid rgba(var(--overlay-rgb, 255, 255, 255), 0.04);
           vertical-align: middle;
         }
         .leaderboard-table tr:hover {
-          background: rgba(255, 255, 255, 0.02);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.02);
         }
         .row-winner {
           background: rgba(245, 158, 11, 0.04) !important;
@@ -925,14 +925,14 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
           display: flex;
           align-items: center;
           gap: 0.3rem;
-          color: #fbbf24;
+          color: var(--tint-amber, #fbbf24);
           font-weight: 800;
         }
         .trophy-silver {
           display: flex;
           align-items: center;
           gap: 0.3rem;
-          color: #94a3b8;
+          color: var(--text-secondary, #94a3b8);
           font-weight: 700;
         }
         .rank-num {
@@ -944,7 +944,7 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
         }
         .model-bold {
           font-weight: 700;
-          color: #fff;
+          color: var(--text-strong, #fff);
         }
         .provider-sub {
           font-size: 0.7rem;
@@ -970,7 +970,7 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
         }
         .elo-chip {
           background: rgba(245, 158, 11, 0.12);
-          color: #fbbf24;
+          color: var(--tint-amber, #fbbf24);
           padding: 0.2rem 0.5rem;
           border-radius: 4px;
           font-size: 0.75rem;
@@ -984,12 +984,12 @@ export default function BenchmarkRanker({ onSendToWorkspace }) {
         }
         .comp-score-bold {
           font-weight: 800;
-          color: #fff;
+          color: var(--text-strong, #fff);
           font-size: 0.9rem;
         }
         .comp-score-bar {
           height: 4px;
-          background: rgba(255, 255, 255, 0.1);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.1);
           border-radius: 9999px;
           overflow: hidden;
         }

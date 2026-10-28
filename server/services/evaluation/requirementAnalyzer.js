@@ -254,6 +254,10 @@ export function evaluateRequirementCoverage(requirements, candidateText = '', co
       if (text.length > 80) {
         status = 'satisfied';
         evidence = 'Response addresses primary topic comprehensively.';
+      } else if (context.shortFormRequested && /[a-z0-9]/i.test(text)) {
+        // Brevity was asked for, so a short answer is not penalized for its length
+        status = 'satisfied';
+        evidence = 'Short response, as the prompt requested a brief or counted answer.';
       } else if (text.length > 20) {
         status = 'partially_satisfied';
         evidence = 'Brief response; core intent partially addressed.';

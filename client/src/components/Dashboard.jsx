@@ -245,7 +245,7 @@ export default function Dashboard({ models = [] }) {
           font-family: var(--font-display);
           font-size: 1.85rem;
           font-weight: 800;
-          color: #fff;
+          color: var(--text-strong, #fff);
         }
         .model-stats-card {
           padding: 1.5rem;
@@ -272,7 +272,7 @@ export default function Dashboard({ models = [] }) {
         }
         .stats-table td {
           padding: 0.85rem 1rem;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+          border-bottom: 1px solid rgba(var(--overlay-rgb, 255, 255, 255), 0.04);
         }
         .model-name-cell {
           display: flex;
@@ -285,8 +285,8 @@ export default function Dashboard({ models = [] }) {
           gap: 1rem;
         }
         .eval-metric-box {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.07);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.03);
+          border: 1px solid rgba(var(--overlay-rgb, 255, 255, 255), 0.07);
           border-radius: var(--radius-sm);
           padding: 1rem;
           display: flex;
@@ -308,10 +308,10 @@ export default function Dashboard({ models = [] }) {
           font-size: 0.72rem;
           color: var(--text-secondary);
         }
-        .text-purple { color: #c084fc; }
-        .text-rose { color: #fb7185; }
-        .text-cyan { color: #22d3ee; }
-        .text-emerald { color: #34d399; }
+        .text-purple { color: var(--tint-purple, #c084fc); }
+        .text-rose { color: var(--tint-rose, #fb7185); }
+        .text-cyan { color: var(--tint-cyan, #22d3ee); }
+        .text-emerald { color: var(--tint-emerald, #34d399); }
       `}</style>
     </div>
   );

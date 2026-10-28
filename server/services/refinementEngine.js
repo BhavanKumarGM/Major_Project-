@@ -31,9 +31,21 @@ function categoryRequirements(category, analysis, lower) {
         'Show example inputs with expected outputs (e.g. 2, 17, 25, -5).'
       ];
     }
+    const useTech = tech ? `Use ${tech}${analysis.technologies.length > 1 ? ` (with ${analysis.technologies.slice(1).join(', ')})` : ''}.`
+      : 'Choose a suitable programming language and say which one you used.';
+    // Conceptual questions ("explain what a closure is") need an explanation, not a full program
+    const isConceptual = /^\s*(explain|what|why|how does|how do|when|describe|compare|difference)\b/.test(lower) &&
+      !/\b(write|implement|build|create|code|program|script|fix|debug|refactor)\b/.test(lower);
+    if (isConceptual) {
+      return [
+        useTech,
+        'Explain the concept clearly, starting with a one-sentence definition.',
+        'Include a short code example that illustrates it.',
+        'Mention common pitfalls or typical use cases.'
+      ];
+    }
     return [
-      tech ? `Use ${tech}${analysis.technologies.length > 1 ? ` (with ${analysis.technologies.slice(1).join(', ')})` : ''}.`
-        : 'Choose a suitable programming language and say which one you used.',
+      useTech,
       'Provide complete, runnable code with brief comments.',
       'Handle edge cases and invalid input.',
       'Explain the approach, including time and space complexity where relevant.',

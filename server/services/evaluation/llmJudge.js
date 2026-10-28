@@ -4,11 +4,26 @@
  * anchored scoring rubrics (0-100), and graceful fallback to degraded mode.
  */
 
+// Provider calls for a full grading prompt routinely take 10-20 s (Gemini 2.5 Flash averages ~14 s here)
+export const DEFAULT_JUDGE_TIMEOUT_MS = Number(process.env.JUDGE_TIMEOUT_MS) || 60000;
+
+const SCORE_KEYS = ['correctness', 'relevance', 'completeness', 'clarity', 'instructionFollowing'];
+
+// Failures worth retrying: overload ("high demand"), rate limits, timeouts, network blips, unparseable output
+const TRANSIENT_ERROR_TYPES = new Set(['rate_limit', 'timeout', 'network', 'provider_error']);
+const JUDGE_RETRY_DELAY_MS = Number(process.env.JUDGE_RETRY_DELAY_MS ?? 1500);
+// Bounds cost: at most 2 judge calls per answer
+const MAX_CALLS_PER_ANSWER = 2;
+
 export class LLMJudge {
-  constructor({ llmService = null, defaultJudgeModel = 'gemini-2-5-flash', enabled = false } = {}) {
+  constructor({ llmService = null, defaultJudgeModel = 'gemini-2-5-flash', enabled = false, selectModel = null, retryDelayMs = JUDGE_RETRY_DELAY_MS } = {}) {
     this.llmService = llmService;
     this.defaultJudgeModel = defaultJudgeModel;
     this.enabled = enabled;
+    // Optional candidate -> judge model id, or ordered list of ids to fall back through.
+    // Used to avoid a model grading its own answer and to switch judges when one provider is down.
+    this.selectModel = selectModel;
+    this.retryDelayMs = retryDelayMs;
   }
 
   /**
@@ -22,7 +37,7 @@ export class LLMJudge {
     documentContext = '',
     referenceAnswer = '',
     judgeModel = null,
-    timeoutMs = 8000
+    timeoutMs = DEFAULT_JUDGE_TIMEOUT_MS
   }) {
     if (!this.enabled || !this.llmService) {
       return {
@@ -33,7 +48,7 @@ export class LLMJudge {
       };
     }
 
-    const modelToUse = judgeModel || this.defaultJudgeModel;
+    const models = judgeModel ? [judgeModel] : [].concat(this.selectModel?.(candidate) || this.defaultJudgeModel);
     const prompt = this.buildJudgePrompt({
       candidate,
       originalPrompt,
@@ -43,33 +58,74 @@ export class LLMJudge {
       referenceAnswer
     });
 
-    try {
-      const response = await this.callJudgeWithTimeout(modelToUse, prompt, timeoutMs);
-      const parsed = this.parseJudgeResponse(response.text);
+    // With a second judge available, a failure moves straight to it (an overloaded provider rarely recovers
+    // within seconds); with only one, a temporary failure is retried once after a short wait
+    const plan = models.length > 1 ? models.slice(0, MAX_CALLS_PER_ANSWER) : Array(MAX_CALLS_PER_ANSWER).fill(models[0]);
+    const failures = [];
+    for (let i = 0; i < plan.length; i++) {
+      const model = plan[i];
+      try {
+        const parsed = await this.gradeWith(model, prompt, timeoutMs);
+        return {
+          judgeStatus: 'complete',
+          judgeModel: model,
+          scores: parsed.scores,
+          strengths: parsed.strengths || [],
+          weaknesses: parsed.weaknesses || [],
+          diagnosticIssues: parsed.diagnosticIssues || [],
+          verdict: parsed.verdict || ''
+        };
+      } catch (err) {
+        failures.push(`${model}: ${err.message}`);
+        const next = plan[i + 1];
+        if (!next) break;
+        if (next === model) {
+          // Bad keys, exhausted quota and unknown models will not recover on retry
+          if (!err.transient) break;
+          if (this.retryDelayMs > 0) await new Promise(r => setTimeout(r, this.retryDelayMs));
+        }
+      }
+    }
 
-      return {
-        judgeStatus: 'complete',
-        judgeModel: modelToUse,
-        scores: parsed.scores,
-        strengths: parsed.strengths || [],
-        weaknesses: parsed.weaknesses || [],
-        diagnosticIssues: parsed.diagnosticIssues || [],
-        verdict: parsed.verdict || ''
-      };
+    const reason = failures.join('; ');
+    return {
+      judgeStatus: 'degraded',
+      reason: `LLM judge failed or timed out (${reason}). Retaining deterministic baseline evaluation.`,
+      scores: null,
+      findings: [
+        {
+          category: 'evaluation_error',
+          severity: 'low',
+          description: `Semantic LLM judge unavailable: ${reason}`,
+          likelySource: 'evaluation_agent'
+        }
+      ]
+    };
+  }
+
+  // One grading attempt; throws an Error with .transient set when a retry may succeed
+  async gradeWith(model, prompt, timeoutMs) {
+    let response;
+    try {
+      response = await this.callJudgeWithTimeout(model, prompt, timeoutMs);
     } catch (err) {
-      return {
-        judgeStatus: 'degraded',
-        reason: `LLM judge failed or timed out (${err.message}). Retaining deterministic baseline evaluation.`,
-        scores: null,
-        findings: [
-          {
-            category: 'evaluation_error',
-            severity: 'low',
-            description: `Semantic LLM judge unavailable: ${err.message}`,
-            likelySource: 'evaluation_agent'
-          }
-        ]
-      };
+      err.transient = true; // timeout
+      throw err;
+    }
+    // generateSingle reports provider failures as a result, not an exception; never grade with error or demo text
+    if (response?.status === 'error') {
+      const err = new Error(response.errorMessage || `${model} returned an error`);
+      err.transient = TRANSIENT_ERROR_TYPES.has(response.errorType);
+      throw err;
+    }
+    if (response?.isSimulated) {
+      throw new Error(`${model} has no live connection, so its output cannot be used for grading`);
+    }
+    try {
+      return this.parseJudgeResponse(response.text);
+    } catch (err) {
+      err.transient = true; // models occasionally break the JSON format; a second attempt usually works
+      throw err;
     }
   }
 
@@ -156,9 +212,10 @@ Respond ONLY with a single valid JSON object matching this schema. Do not add co
   }
 
   async callJudgeWithTimeout(modelId, prompt, timeoutMs) {
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`LLM Judge timed out after ${timeoutMs}ms`)), timeoutMs)
-    );
+    let timer;
+    const timeoutPromise = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`LLM Judge timed out after ${timeoutMs}ms`)), timeoutMs);
+    });
 
     const callPromise = (async () => {
       // Find candidate model object or synthesize standard model spec
@@ -166,7 +223,11 @@ Respond ONLY with a single valid JSON object matching this schema. Do not add co
       return this.llmService.generateSingle(modelObj, prompt, []);
     })();
 
-    return Promise.race([callPromise, timeoutPromise]);
+    try {
+      return await Promise.race([callPromise, timeoutPromise]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   parseJudgeResponse(rawText) {
@@ -192,7 +253,12 @@ Respond ONLY with a single valid JSON object matching this schema. Do not add co
       throw new Error('Judge response missing "scores" object');
     }
 
-    const clamp = (val) => Math.max(0, Math.min(100, Math.round(Number(val) || 50)));
+    // A missing or non-numeric score means the judge did not follow the format; refuse rather than invent a 50
+    const missing = SCORE_KEYS.filter(k => !Number.isFinite(Number(parsed.scores[k])) || parsed.scores[k] === null || parsed.scores[k] === '');
+    if (missing.length > 0) {
+      throw new Error(`Judge response missing scores: ${missing.join(', ')}`);
+    }
+    const clamp = (val) => Math.max(0, Math.min(100, Math.round(Number(val))));
 
     return {
       scores: {

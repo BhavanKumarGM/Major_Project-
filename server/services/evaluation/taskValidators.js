@@ -5,6 +5,74 @@
  * and never claims independent verification when evidence is absent.
  */
 
+import vm from 'node:vm';
+import { spawnSync } from 'node:child_process';
+import { isCodeRequested } from './ruleValidator.js';
+
+const PY_LANGS = new Set(['python', 'py', 'python3']);
+
+// Parses with Python's own ast module in isolated mode (-I). ast.parse builds a syntax tree and never runs the code.
+const PY_PARSE_SCRIPT = [
+  'import ast, sys',
+  'src = sys.stdin.buffer.read().decode("utf-8", "replace")',
+  'try:',
+  '    ast.parse(src)',
+  'except SyntaxError as e:',
+  '    print(f"{e.msg} (line {e.lineno})")',
+  '    sys.exit(3)'
+].join('\n');
+
+let pythonBin; // undefined = not probed yet, null = no Python on this host
+function findPython() {
+  if (pythonBin !== undefined) return pythonBin;
+  pythonBin = null;
+  for (const bin of [process.env.PYTHON_BIN, 'python3', 'python', 'py'].filter(Boolean)) {
+    const probe = spawnSync(bin, ['--version'], { encoding: 'utf8', timeout: 3000, windowsHide: true });
+    // Windows' "python" Store alias exits non-zero without printing a version
+    if (probe.status === 0 && /Python 3/.test(`${probe.stdout}${probe.stderr}`)) {
+      pythonBin = bin;
+      break;
+    }
+  }
+  return pythonBin;
+}
+
+/**
+ * Syntax-only check for Python. Returns null when Python is not installed or the check could not run,
+ * so the caller reports nothing rather than guessing.
+ */
+export function checkPythonSyntax(code) {
+  const bin = findPython();
+  if (!bin) return null;
+  const res = spawnSync(bin, ['-I', '-c', PY_PARSE_SCRIPT], { input: code, encoding: 'utf8', timeout: 3000, windowsHide: true });
+  if (res.status === 0) return { valid: true };
+  if (res.status === 3) return { valid: false, error: (res.stdout || 'syntax error').trim() };
+  return null;
+}
+
+const JS_LANGS = new Set(['js', 'javascript', 'node', 'nodejs', 'mjs', 'cjs']);
+
+/**
+ * Syntax-only check for JavaScript. new vm.Script() parses and compiles the source but never runs it
+ * (runInContext is not called). Module syntax is blanked out first, since scripts cannot contain it.
+ */
+export function checkJavaScriptSyntax(code) {
+  const asScript = code
+    .replace(/^\s*import\s[^;\n]*;?\s*$/gm, '')
+    .replace(/^\s*export\s+default\s+/gm, 'void ')
+    .replace(/^\s*export\s+(?=(?:async\s+)?function|class|const|let|var)/gm, '')
+    .replace(/^\s*export\s*\{[^}]*\}[^;\n]*;?\s*$/gm, '');
+  try {
+    // Wrapped in an async function so top-level await and return statements are accepted
+    new vm.Script(`(async function () {\n${asScript}\n})`, { filename: 'candidate.js' });
+    return { valid: true };
+  } catch (err) {
+    if (!(err instanceof SyntaxError) && err?.name !== 'SyntaxError') return { valid: true };
+    const line = err.stack?.match(/candidate\.js:(\d+)/)?.[1];
+    return { valid: false, error: `${err.message}${line ? ` (line ${Number(line) - 1})` : ''}` };
+  }
+}
+
 class BaseTaskValidator {
   constructor(taskType) {
     this.taskType = taskType;
@@ -42,7 +110,11 @@ export class CodingTaskValidator extends BaseTaskValidator {
       codeBlocks.push({ lang: match[1]?.trim().toLowerCase() || '', code: match[2] });
     }
 
-    if (codeBlocks.length === 0) {
+    // A coding-category prompt that does not ask for code ("tips for learning to code") is not penalized for having none
+    const codeExpected = context.originalPrompt == null || isCodeRequested(context.originalPrompt);
+    if (codeBlocks.length === 0 && !codeExpected) {
+      // nothing to validate
+    } else if (codeBlocks.length === 0) {
       findings.push({
         rule: 'code_block_required',
         status: 'fail',
@@ -79,6 +151,52 @@ export class CodingTaskValidator extends BaseTaskValidator {
             description: 'Static delimiter balance check passed for code block.',
             evidence: 'Balanced brackets and braces.'
           });
+
+          const pyCheck = PY_LANGS.has(block.lang) ? checkPythonSyntax(block.code) : null;
+          if (pyCheck && !pyCheck.valid) {
+            findings.push({
+              rule: 'python_syntax',
+              status: 'fail',
+              severity: 'high',
+              category: 'code_validation_failure',
+              description: `Python code block does not parse: ${pyCheck.error}.`,
+              evidence: pyCheck.error,
+              recommendedCorrection: 'Fix the syntax error so the code compiles.'
+            });
+            scoreAdjustments.correctness -= 10;
+          } else if (pyCheck) {
+            findings.push({
+              rule: 'python_syntax',
+              status: 'pass',
+              severity: 'low',
+              category: 'code_validation_failure',
+              description: 'Python code block parses without syntax errors (parsed, not executed).',
+              evidence: 'Parsed with Python ast.'
+            });
+          }
+
+          const jsCheck = JS_LANGS.has(block.lang) ? checkJavaScriptSyntax(block.code) : null;
+          if (jsCheck && !jsCheck.valid) {
+            findings.push({
+              rule: 'javascript_syntax',
+              status: 'fail',
+              severity: 'high',
+              category: 'code_validation_failure',
+              description: `JavaScript code block does not parse: ${jsCheck.error}.`,
+              evidence: jsCheck.error,
+              recommendedCorrection: 'Fix the syntax error so the code compiles.'
+            });
+            scoreAdjustments.correctness -= 10;
+          } else if (jsCheck) {
+            findings.push({
+              rule: 'javascript_syntax',
+              status: 'pass',
+              severity: 'low',
+              category: 'code_validation_failure',
+              description: 'JavaScript code block parses without syntax errors (compiled, not executed).',
+              evidence: 'Parsed with the Node.js compiler.'
+            });
+          }
         }
       }
     }
@@ -337,7 +455,8 @@ export class GeneralReasoningValidator extends BaseTaskValidator {
 
 export function getTaskValidator(taskCategory = 'General') {
   const catLower = (taskCategory || '').toLowerCase();
-  if (catLower.includes('code') || catLower.includes('programming')) {
+  // 'cod' matches both "code" and the analysis category "Coding"
+  if (catLower.includes('cod') || catLower.includes('programming')) {
     return new CodingTaskValidator();
   }
   if (catLower.includes('research') || catLower.includes('fact')) {

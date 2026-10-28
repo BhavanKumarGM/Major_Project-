@@ -143,6 +143,10 @@ export class LLMService {
     if (liveCall) {
       try {
         const result = await liveCall(fullPrompt, conversationContext);
+        // A blank reply (e.g. a reasoning model that spent its budget thinking) is not an answer
+        if (!String(result?.text || '').trim()) {
+          throw new Error('The model returned an empty answer.');
+        }
         return { ...result, ...meta, latency: Date.now() - startTime, isLive: true, isSimulated: false };
       } catch (err) {
         const errorType = classifyProviderError(err);

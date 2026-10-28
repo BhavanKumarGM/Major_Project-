@@ -23,7 +23,8 @@ import {
   CheckCircle,
   XCircle,
   HelpCircle,
-  Info
+  Info,
+  RefreshCw
 } from 'lucide-react';
 
 export default function ComparisonView({
@@ -31,7 +32,10 @@ export default function ComparisonView({
   onSelectBranch,
   onSynthesize,
   isSynthesizing,
-  activeSelectedModelId
+  activeSelectedModelId,
+  onCheckWithJudge,
+  isCheckingWithJudge,
+  judgeCheckError
 }) {
   const [copiedId, setCopiedId] = useState(null);
   const [showFullCritic, setShowFullCritic] = useState(true);
@@ -174,11 +178,34 @@ export default function ComparisonView({
                 <div className="critic-conflict-box">
                   <AlertTriangle size={15} className="text-amber" />
                   <div>
-                    <strong>Refinement Conflict Detected:</strong>
+                    <strong>{critic.conflictsDetected.every(c => c.type === 'answer_disagreement') ? 'Answers Disagree:' : 'Conflict Detected:'}</strong>
                     {critic.conflictsDetected.map((c, i) => (
                       <div key={i} className="conflict-desc">{c.description}</div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Rule checks cannot verify facts: let the user ask the LLM judge for this turn */}
+              {onCheckWithJudge && critic.evaluationStatus !== 'complete' && responses.some(r => r.status !== 'error' && !r.isSimulated) && (
+                <div className="judge-check-row">
+                  <span>
+                    {critic.conflictsDetected?.some(c => c.type === 'answer_disagreement')
+                      ? 'The answers disagree. An LLM judge can check which one is right.'
+                      : critic.evaluationStatus === 'degraded'
+                        ? (critic.evaluationMetadata?.judge?.note || 'The LLM judge could not grade these answers.')
+                        : 'Scored by rule checks only, which cannot verify facts.'}
+                  </span>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={onCheckWithJudge}
+                    disabled={isCheckingWithJudge}
+                    title={`Grades each answer with an LLM call (${responses.length} billable call${responses.length > 1 ? 's' : ''}, up to ${responses.length * 2} if a provider is busy).`}
+                  >
+                    {isCheckingWithJudge ? <RefreshCw size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
+                    <span>{isCheckingWithJudge ? 'Checking…' : 'Check facts with LLM judge'}</span>
+                  </button>
+                  {judgeCheckError && <div className="judge-check-error">Could not run the judge: {judgeCheckError}</div>}
                 </div>
               )}
 
@@ -557,7 +584,7 @@ export default function ComparisonView({
         }
         .critic-evaluation-panel {
           border: 1px solid rgba(168, 85, 247, 0.3);
-          background: rgba(22, 18, 38, 0.85);
+          background: rgba(var(--surface-rgb, 22, 18, 38), 0.85);
           border-radius: var(--radius-lg);
           overflow: hidden;
         }
@@ -583,7 +610,7 @@ export default function ComparisonView({
           font-family: var(--font-display);
           font-weight: 700;
           font-size: 0.95rem;
-          color: #d8b4fe;
+          color: var(--tint-purple, #d8b4fe);
         }
         .eval-status-tag {
           font-size: 0.72rem;
@@ -596,37 +623,37 @@ export default function ComparisonView({
         }
         .tag-semantic {
           background: rgba(16, 185, 129, 0.15);
-          color: #6ee7b7;
+          color: var(--tint-emerald, #6ee7b7);
           border: 1px solid rgba(16, 185, 129, 0.3);
         }
         .tag-degraded {
           background: rgba(245, 158, 11, 0.15);
-          color: #fde047;
+          color: var(--tint-amber, #fde047);
           border: 1px solid rgba(245, 158, 11, 0.3);
         }
         .tag-deterministic {
           background: rgba(6, 182, 212, 0.15);
-          color: #67e8f9;
+          color: var(--tint-cyan, #67e8f9);
           border: 1px solid rgba(6, 182, 212, 0.3);
         }
         .tag-critical-fail {
           background: rgba(244, 63, 94, 0.2);
-          color: #fda4af;
+          color: var(--tint-rose, #fda4af);
           border: 1px solid rgba(244, 63, 94, 0.4);
         }
         .tag-coverage {
           background: rgba(168, 85, 247, 0.15);
-          color: #e9d5ff;
+          color: var(--tint-purple, #e9d5ff);
           border: 1px solid rgba(168, 85, 247, 0.3);
         }
-        .text-purple { color: #c084fc; }
-        .text-amber { color: #fbbf24; }
-        .text-cyan { color: #22d3ee; }
-        .text-emerald { color: #34d399; }
-        .text-rose { color: #fb7185; }
+        .text-purple { color: var(--tint-purple, #c084fc); }
+        .text-amber { color: var(--tint-amber, #fbbf24); }
+        .text-cyan { color: var(--tint-cyan, #22d3ee); }
+        .text-emerald { color: var(--tint-emerald, #34d399); }
+        .text-rose { color: var(--tint-rose, #fb7185); }
         .critic-winner-tag {
           font-size: 0.8rem;
-          color: #fef08a;
+          color: var(--tint-amber, #fef08a);
           display: flex;
           align-items: center;
           gap: 0.35rem;
@@ -637,7 +664,7 @@ export default function ComparisonView({
         }
         .critic-no-winner-tag {
           font-size: 0.8rem;
-          color: #fda4af;
+          color: var(--tint-rose, #fda4af);
           display: flex;
           align-items: center;
           gap: 0.35rem;
@@ -654,16 +681,29 @@ export default function ComparisonView({
         }
         .critic-rationale-box {
           font-size: 0.85rem;
-          color: #f1f5f9;
-          background: rgba(255, 255, 255, 0.04);
+          color: var(--text-strong, #f1f5f9);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.04);
           border-left: 3px solid var(--accent-purple);
           padding: 0.75rem 1rem;
           border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
           line-height: 1.5;
         }
+        .judge-check-row {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 0.5rem 0.75rem;
+          font-size: 0.8rem;
+          color: var(--text-secondary);
+          padding: 0.55rem 0.9rem;
+          border: 1px dashed var(--border-light);
+          border-radius: var(--radius-sm);
+        }
+        .judge-check-row > span { flex: 1; min-width: 200px; }
+        .judge-check-error { flex-basis: 100%; color: var(--tint-rose, #fda4af); }
         .critic-conflict-box {
           font-size: 0.82rem;
-          color: #fef08a;
+          color: var(--tint-amber, #fef08a);
           background: rgba(245, 158, 11, 0.1);
           border: 1px solid rgba(245, 158, 11, 0.3);
           padding: 0.6rem 0.9rem;
@@ -675,7 +715,7 @@ export default function ComparisonView({
         .conflict-desc {
           margin-top: 0.2rem;
           font-size: 0.78rem;
-          color: #fde68a;
+          color: var(--tint-amber, #fde68a);
         }
         .score-table-wrap {
           overflow-x: auto;
@@ -695,7 +735,7 @@ export default function ComparisonView({
         }
         .score-table td {
           padding: 0.65rem 0.8rem;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+          border-bottom: 1px solid rgba(var(--overlay-rgb, 255, 255, 255), 0.04);
           vertical-align: middle;
         }
         .model-cell {
@@ -720,30 +760,30 @@ export default function ComparisonView({
         }
         .pill-accepted {
           background: rgba(16, 185, 129, 0.15);
-          color: #6ee7b7;
+          color: var(--tint-emerald, #6ee7b7);
           border: 1px solid rgba(16, 185, 129, 0.3);
         }
         .pill-revision {
           background: rgba(245, 158, 11, 0.15);
-          color: #fde047;
+          color: var(--tint-amber, #fde047);
           border: 1px solid rgba(245, 158, 11, 0.3);
         }
         .pill-rejected {
           background: rgba(244, 63, 94, 0.2);
-          color: #fda4af;
+          color: var(--tint-rose, #fda4af);
           border: 1px solid rgba(244, 63, 94, 0.4);
         }
         .winner-pill {
           font-size: 0.65rem;
           font-weight: 700;
-          color: #fef08a;
+          color: var(--tint-amber, #fef08a);
           background: rgba(245, 158, 11, 0.2);
           padding: 0.15rem 0.45rem;
           border-radius: 4px;
         }
         .score-cell {
           font-family: var(--font-mono);
-          color: #cbd5e1;
+          color: var(--text-body, #cbd5e1);
         }
         .score-badge {
           display: inline-block;
@@ -751,17 +791,17 @@ export default function ComparisonView({
           font-weight: 700;
           padding: 0.2rem 0.5rem;
           border-radius: 4px;
-          background: rgba(255, 255, 255, 0.08);
-          color: #fff;
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.08);
+          color: var(--text-strong, #fff);
         }
         .score-badge.high-score {
           background: rgba(16, 185, 129, 0.2);
-          color: #6ee7b7;
+          color: var(--tint-emerald, #6ee7b7);
           border: 1px solid rgba(16, 185, 129, 0.4);
         }
         .score-badge.critical-fail-score {
           background: rgba(244, 63, 94, 0.2);
-          color: #fda4af;
+          color: var(--tint-rose, #fda4af);
           border: 1px solid rgba(244, 63, 94, 0.4);
         }
         .diagnostics-action-row {
@@ -770,8 +810,8 @@ export default function ComparisonView({
           margin-top: 0.25rem;
         }
         .diagnostics-panel {
-          background: rgba(15, 23, 42, 0.7);
-          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(var(--surface-rgb, 15, 23, 42), 0.7);
+          border: 1px solid rgba(var(--overlay-rgb, 255, 255, 255), 0.1);
           border-radius: var(--radius-md);
           padding: 1rem;
           display: flex;
@@ -784,7 +824,7 @@ export default function ComparisonView({
           gap: 0.45rem;
           font-size: 0.85rem;
           font-weight: 700;
-          color: #f1f5f9;
+          color: var(--text-strong, #f1f5f9);
           margin-bottom: 0.6rem;
         }
         .diag-table {
@@ -796,11 +836,11 @@ export default function ComparisonView({
           text-align: left;
           padding: 0.5rem;
           color: var(--text-muted);
-          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+          border-bottom: 1px solid rgba(var(--overlay-rgb, 255, 255, 255), 0.08);
         }
         .diag-table td {
           padding: 0.55rem;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+          border-bottom: 1px solid rgba(var(--overlay-rgb, 255, 255, 255), 0.04);
           vertical-align: top;
         }
         .type-tag {
@@ -809,8 +849,8 @@ export default function ComparisonView({
           padding: 0.1rem 0.35rem;
           border-radius: 3px;
         }
-        .tag-mandatory { background: rgba(244, 63, 94, 0.2); color: #fda4af; }
-        .tag-optional { background: rgba(100, 116, 139, 0.2); color: #cbd5e1; }
+        .tag-mandatory { background: rgba(244, 63, 94, 0.2); color: var(--tint-rose, #fda4af); }
+        .tag-optional { background: rgba(100, 116, 139, 0.2); color: var(--text-body, #cbd5e1); }
         .status-tag {
           display: inline-flex;
           align-items: center;
@@ -820,13 +860,13 @@ export default function ComparisonView({
           padding: 0.12rem 0.4rem;
           border-radius: 4px;
         }
-        .status-satisfied { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
-        .status-partial { background: rgba(245, 158, 11, 0.15); color: #fde047; }
-        .status-missing { background: rgba(244, 63, 94, 0.2); color: #fda4af; }
+        .status-satisfied { background: rgba(16, 185, 129, 0.15); color: var(--tint-emerald, #6ee7b7); }
+        .status-partial { background: rgba(245, 158, 11, 0.15); color: var(--tint-amber, #fde047); }
+        .status-missing { background: rgba(244, 63, 94, 0.2); color: var(--tint-rose, #fda4af); }
         .status-contradicted { background: rgba(244, 63, 94, 0.25); color: #f43f5e; }
-        .status-unverifiable { background: rgba(6, 182, 212, 0.15); color: #67e8f9; }
-        .evidence-cell { color: #94a3b8; font-family: var(--font-mono); font-size: 0.75rem; }
-        .correction-cell { color: #fef08a; font-size: 0.75rem; }
+        .status-unverifiable { background: rgba(6, 182, 212, 0.15); color: var(--tint-cyan, #67e8f9); }
+        .evidence-cell { color: var(--text-secondary, #94a3b8); font-family: var(--font-mono); font-size: 0.75rem; }
+        .correction-cell { color: var(--tint-amber, #fef08a); font-size: 0.75rem; }
         .chosen-branch-bar {
           display: flex;
           align-items: center;
@@ -848,8 +888,8 @@ export default function ComparisonView({
           gap: 0.75rem;
         }
         .issue-card {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.03);
+          border: 1px solid rgba(var(--overlay-rgb, 255, 255, 255), 0.08);
           border-radius: var(--radius-sm);
           padding: 0.75rem;
           display: flex;
@@ -877,35 +917,35 @@ export default function ComparisonView({
         .sev-medium { background: #d97706; color: #fff; }
         .sev-low { background: #0284c7; color: #fff; }
         .issue-category {
-          color: #cbd5e1;
+          color: var(--text-body, #cbd5e1);
           font-weight: 600;
           text-transform: capitalize;
         }
         .issue-model, .issue-stage {
-          color: #94a3b8;
-          background: rgba(255, 255, 255, 0.05);
+          color: var(--text-secondary, #94a3b8);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.05);
           padding: 0.05rem 0.3rem;
           border-radius: 3px;
         }
-        .issue-desc { font-size: 0.8rem; color: #f1f5f9; font-weight: 500; }
-        .issue-evidence { font-size: 0.75rem; color: #94a3b8; }
-        .issue-evidence code { background: rgba(0,0,0,0.3); padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.72rem; }
-        .issue-correction { font-size: 0.75rem; color: #fef08a; }
+        .issue-desc { font-size: 0.8rem; color: var(--text-strong, #f1f5f9); font-weight: 500; }
+        .issue-evidence { font-size: 0.75rem; color: var(--text-secondary, #94a3b8); }
+        .issue-evidence code { background: rgba(var(--shade-rgb, 0,0,0),0.3); padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.72rem; }
+        .issue-correction { font-size: 0.75rem; color: var(--tint-amber, #fef08a); }
         .no-issues-box {
           display: flex;
           align-items: center;
           gap: 0.5rem;
           font-size: 0.8rem;
-          color: #a7f3d0;
+          color: var(--tint-emerald, #a7f3d0);
           padding: 0.5rem 0;
         }
         .diag-disclaimer {
           font-size: 0.72rem;
-          color: #94a3b8;
+          color: var(--text-secondary, #94a3b8);
           display: flex;
           align-items: center;
           gap: 0.4rem;
-          border-top: 1px solid rgba(255, 255, 255, 0.06);
+          border-top: 1px solid rgba(var(--overlay-rgb, 255, 255, 255), 0.06);
           padding-top: 0.6rem;
         }
         .critique-details-grid {
@@ -920,7 +960,7 @@ export default function ComparisonView({
           font-size: 0.825rem;
           font-weight: 700;
           margin-bottom: 0.6rem;
-          color: #fff;
+          color: var(--text-strong, #fff);
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -945,7 +985,7 @@ export default function ComparisonView({
         }
         .critique-points li {
           font-size: 0.775rem;
-          color: #cbd5e1;
+          color: var(--text-body, #cbd5e1);
           display: flex;
           align-items: flex-start;
           gap: 0.4rem;
@@ -954,7 +994,7 @@ export default function ComparisonView({
         .critic-disclaimer {
           font-size: 0.75rem;
           color: var(--text-dim);
-          border-top: 1px solid rgba(255, 255, 255, 0.06);
+          border-top: 1px solid rgba(var(--overlay-rgb, 255, 255, 255), 0.06);
           padding-top: 0.75rem;
         }
         .synthesis-action-bar {
@@ -973,12 +1013,12 @@ export default function ComparisonView({
           align-items: center;
           gap: 0.5rem;
           font-size: 0.85rem;
-          color: #f3e8ff;
+          color: var(--tint-purple, #f3e8ff);
           font-weight: 500;
         }
         .synthesis-response-card {
           border: 1px solid rgba(168, 85, 247, 0.4);
-          background: rgba(22, 16, 36, 0.85);
+          background: rgba(var(--surface-rgb, 22, 16, 36), 0.85);
           box-shadow: 0 0 30px rgba(168, 85, 247, 0.15);
           border-radius: var(--radius-lg);
           padding: 1.25rem;
@@ -989,7 +1029,7 @@ export default function ComparisonView({
           gap: 0.3rem;
           font-size: 0.7rem;
           font-weight: 600;
-          color: #6ee7b7;
+          color: var(--tint-emerald, #6ee7b7);
           background: rgba(16, 185, 129, 0.15);
           padding: 0.15rem 0.5rem;
           border-radius: 4px;
@@ -1018,7 +1058,7 @@ export default function ComparisonView({
         .selected-branch-card {
           border-color: var(--accent-emerald);
           box-shadow: 0 0 25px rgba(16, 185, 129, 0.2);
-          background: rgba(16, 32, 28, 0.75);
+          background: rgba(var(--surface-rgb, 16, 32, 28), 0.75);
         }
         .response-card-header {
           display: flex;
@@ -1046,7 +1086,7 @@ export default function ComparisonView({
           font-family: var(--font-display);
           font-size: 1rem;
           font-weight: 700;
-          color: #fff;
+          color: var(--text-strong, #fff);
         }
         .model-sub {
           font-size: 0.72rem;
@@ -1065,7 +1105,7 @@ export default function ComparisonView({
           gap: 0.25rem;
           font-size: 0.7rem;
           color: var(--text-secondary);
-          background: rgba(255, 255, 255, 0.05);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.05);
           padding: 0.15rem 0.4rem;
           border-radius: 4px;
         }

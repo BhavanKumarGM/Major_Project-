@@ -256,7 +256,7 @@ function DecisionStyles() {
         gap: 0.5rem;
         align-items: flex-start;
         font-size: 0.82rem;
-        color: #fda4af;
+        color: var(--tint-rose, #fda4af);
         background: rgba(244, 63, 94, 0.08);
         border: 1px solid rgba(244, 63, 94, 0.25);
         border-radius: var(--radius-sm);
@@ -267,7 +267,7 @@ function DecisionStyles() {
       .decision-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
       .decision-other { display: inline-flex; gap: 0.35rem; align-items: center; }
       .decision-select {
-        background: rgba(0, 0, 0, 0.3);
+        background: rgba(var(--shade-rgb, 0, 0, 0), 0.3);
         color: var(--text-primary);
         border: 1px solid var(--border-light);
         border-radius: var(--radius-sm);

@@ -209,10 +209,10 @@ export default function LegalAnalyzer({ onSendToWorkspace }) {
         }
         .legal-textarea {
           width: 100%;
-          background: rgba(0, 0, 0, 0.4);
+          background: rgba(var(--shade-rgb, 0, 0, 0), 0.4);
           border: 1px solid var(--border-light);
           border-radius: var(--radius-md);
-          color: #fff;
+          color: var(--text-strong, #fff);
           font-family: var(--font-mono);
           font-size: 0.85rem;
           padding: 1rem;
@@ -253,7 +253,7 @@ export default function LegalAnalyzer({ onSendToWorkspace }) {
         .text-rose { color: var(--accent-rose); }
         .risk-meter {
           height: 8px;
-          background: rgba(255, 255, 255, 0.08);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.08);
           border-radius: 4px;
           overflow: hidden;
           margin-bottom: 0.6rem;
@@ -285,11 +285,11 @@ export default function LegalAnalyzer({ onSendToWorkspace }) {
           justify-content: space-between;
           align-items: center;
           font-size: 0.85rem;
-          color: #fff;
+          color: var(--text-strong, #fff);
         }
         .badge-rose {
           background: rgba(244, 63, 94, 0.15);
-          color: #fda4af;
+          color: var(--tint-rose, #fda4af);
           border: 1px solid rgba(244, 63, 94, 0.3);
         }
         .finding-text {
@@ -306,7 +306,7 @@ export default function LegalAnalyzer({ onSendToWorkspace }) {
           padding: 0.6rem 0.8rem;
           border-radius: var(--radius-sm);
           font-size: 0.78rem;
-          color: #6ee7b7;
+          color: var(--tint-emerald, #6ee7b7);
         }
         .export-action-row {
           margin-top: 0.5rem;

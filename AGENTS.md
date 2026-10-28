@@ -214,7 +214,7 @@ The UI shows the badges "Live API" (`isLive`), "Simulated" (`isSimulated`) and "
 6. **Saving:** `memoryService.addTurn()` stores the turn with `executionMode: 'single'`, `decision` and `selectedModelId = response.modelId`. Failed turns are saved for diagnostics but **left out of follow-up history** (`getActiveHistoryContext` drops turns whose chosen response has `status: 'error'`).
 7. **Response:** `{ success, code: 'ok'|'generation_failed'|…, error?, analysis, refinement, decision, generation: { status, isLive, isSimulated, errorType, response }, criticEvaluation | null, conversation: { id, turnId } }`.
 
-**LLM judge** (both modes): opt-in through the Workspace "LLM judge" checkbox, stored in `localStorage['hiveJudgeEnabled']`. If the judge model (`gemini-2-5-flash`) has no credentials, `criticEngine` skips it. In that case `evaluationMetadata.judge = { requested, model, available:false, note }` and the status is `degraded`, so simulated text is never graded as if a judge had run.
+**LLM judge** (both modes): opt-in through the Workspace "LLM judge" checkbox, stored in `localStorage['hiveJudgeEnabled']`. If no judge model has credentials (or a named `judgeModel` has none), `criticEngine` skips it. In that case `evaluationMetadata.judge = { requested, model, available:false, note }` and the status is `degraded`, so simulated text is never graded as if a judge had run.
 
 **UI** (Workspace + [DecisionPanel.jsx](client/src/components/DecisionPanel.jsx)):
 - **Model pills:** in Single AI the bar shows "Auto (Decision Model)" plus one pill per model; clicking a model pill sets a manual override.
@@ -271,15 +271,17 @@ Entry: `evaluateResponses()` in [criticEngine.js](server/services/criticEngine.j
 Request body: `{ originalPrompt, refinedPrompt, responses[], weights?, analysis?, documentContext?, referenceAnswer?, options?: { enableLLMJudge, judgeModel }, revisionSettings?: { enabled, maxRevisions } }`.
 
 Per candidate:
-1. **Deterministic checks** (`ruleValidator.runDeterministicChecks`): empty or malformed text, provider error text, JSON-format requirement, negative constraints.
+1. **Deterministic checks** (`ruleValidator.runDeterministicChecks`): empty or malformed text, provider error text, JSON validity, code fences (only when `isCodeRequested(prompt)`, and skipped for coding prompts where the task validator checks them), negative constraints (no recursion/loops/external libraries), requested sections, refusals, item counts ("exactly 3", "give 5 tips"), word limits (any script), requested formats (table, numbered/bullet list, N sentences, N paragraphs, one word), answer language ("explain X in Kannada", checked by Unicode script), off-topic answers (long answer sharing no content word with the prompt), unclosed code fences. Checks use the user's prompt, not refinement suggestions.
 2. **Requirement coverage** (`requirementAnalyzer`): requirements extracted from prompt and analysis (core goal, language/technology, format, edge cases, …), each marked `satisfied | missing | unverifiable`. Also detects conflicts between the original and refined prompt.
-3. **Task validator** (`taskValidators.getTaskValidator(primaryCategory)`): Coding (delimiter/syntax checks, **never executes code**, adds a sandbox notice), Research, Summarization, General reasoning. Returns score adjustments and issues.
-4. **Optional LLM judge** (`llmJudge.js`): only when `options.enableLLMJudge` is true. Default judge model `gemini-2-5-flash`, 8 s timeout, JSON rubric. Bad JSON or a failed call leads to `judgeStatus: 'degraded'` and the deterministic score is kept.
+3. **Task validator** (`taskValidators.getTaskValidator(primaryCategory)`): Coding (bracket balance; JavaScript compiled with `vm.Script`, Python parsed with `ast.parse` in a `python -I` subprocess when Python is installed (`PYTHON_BIN`); **code is never executed**), Research, Summarization, General reasoning. Returns score adjustments and issues; the evaluator does not penalize task issues a second time.
+4. **Optional LLM judge** (`llmJudge.js`): only when `options.enableLLMJudge` is true. All answers are graded in parallel. Judge model: `options.judgeModel`, else the models with credentials in `JUDGE_PRIORITY` order (`criticEngine.judgeModelsFor`), the answer's own model last so no model grades itself when another is available. Timeout `JUDGE_TIMEOUT_MS` (60 s). At most 2 judge calls per answer: if another judge model has a key, any failure moves straight to it; with only one model, overload, rate limits, timeouts and bad JSON are retried once after `JUDGE_RETRY_DELAY_MS` (1.5 s), while auth/quota errors are not retried. Output missing any of the five scores is rejected. Judge scores replace the baseline only when the judge graded **every** eligible answer; otherwise all answers keep rule scores (judge findings such as a critical `factual_error` still apply) and the status is `degraded` with `evaluationMetadata.judge.note` ("graded 1 of 2 answers…"). Verified rule findings keep their penalty in judge mode unless the judge reported the same category.
 5. **Simulated output**: `isSimulated === true` adds a `provider_error` / `high` issue.
 6. **Scores (0–100)**: `correctness, relevance, completeness, clarity, instructionFollowing`. Execution errors score 0. Critical failures cap correctness at 35 and instructionFollowing at 30. `overall` = weighted sum using normalized weights (default 0.35 / 0.20 / 0.20 / 0.15 / 0.10; invalid weights fall back to defaults with a warning).
 7. **Eligibility**: `!hasCritical && !executionError && overall >= 40`. Status is `accepted | needs_revision | rejected`.
 
 **Winner selection**: highest `overall` among eligible candidates. **Simulated candidates are excluded whenever at least one live candidate is eligible.** A gap of ≤ 2 points produces a "near-tied" message. No eligible candidate gives `winner: null` and `nextAction: 'reject'`.
+
+**Answer disagreement** (`disagreement.js`): for short factual questions without full judge coverage, the key facts (numbers, proper nouns) of each answer's first sentence (or last, after a filler opener) are compared; disjoint facts add `{ type: 'answer_disagreement' }` to `conflictsDetected` and a note to `recommendationReason`, since rule checks cannot tell which answer is right.
 
 Response (legacy fields kept for backward compatibility; do not remove them):
 ```js
@@ -287,13 +289,14 @@ Response (legacy fields kept for backward compatibility; do not remove them):
   evaluations: [{ modelId, modelName, provider, avatar, badgeColor, isEligible, isSimulated, status,
                   scores:{correctness,relevance,completeness,clarity,instructionFollowing,overall},
                   strengths[], weaknesses[], requirementResults[], issues[], hasCriticalFailure,
-                  judgeDetails:{status, model} }],
+                  judgeDetails:{status, model, reason, verdict} }],
   winner: { modelId, modelName, score } | null,
   recommendationReason, weightsUsed, disclaimer,
   requirementCoverage: { results[], coveragePercent },
   conflictsDetected, issues[], criticalFailures, nextAction: 'accept'|'revise'|'reject',
   evaluationMetadata: { timestamp, durationMs, weightsWarning, hasUnverifiableClaims,
-                        eligibleCandidatesCount, totalCandidatesCount, taskCategory },
+                        eligibleCandidatesCount, totalCandidatesCount, taskCategory, judgeNote?,
+                        judge?: { requested, model, available, note } },
   revisionHistory?, revisionsAttempted? }
 ```
 
@@ -369,6 +372,7 @@ At startup, saved keys override `.env` keys and saved models replace `DEFAULT_MO
 | POST `/api/conversations/:id/turn` | turn fields → `{ success, turn }` | creates the conversation if the id is unknown |
 | POST `/api/conversations/:id/branch` | `{ turnId, selectedModelId }` | updates agreement analytics |
 | POST `/api/conversations/:id/synthesis` | `{ turnId, synthesis }` | |
+| POST `/api/conversations/:id/turns/:turnId/evaluate` | `{ enableLLMJudge? = true, judgeModel? }` | Re-grades the turn's **saved** answers (never client-sent ones) and saves the new `criticEvaluation` plus `reevaluatedAt`; moves the critic-win count. 404 unknown turn, 400 unknown judge model, 409 while that turn is being evaluated. Used by the "Check facts with LLM judge" button. |
 | PUT `/api/conversations/:id/title` | `{ title }` | |
 | DELETE `/api/conversations/:id` | | |
 | GET `/api/stats` | → analytics | |
@@ -391,6 +395,9 @@ At startup, saved keys override `.env` keys and saved models replace `DEFAULT_MO
 | `DATA_DIR` | `server/data` | persistence directory |
 | `OPENAI_MODEL` | `gpt-4o` | OpenAI API model id used by the `gpt-4o` catalog entry |
 | `GENERATION_TIMEOUT_MS` | 120000 | per-request timeout for provider calls |
+| `JUDGE_TIMEOUT_MS` | 60000 | per-call timeout for the LLM judge |
+| `JUDGE_RETRY_DELAY_MS` | 1500 | wait before retrying an overloaded or failed judge call |
+| `PYTHON_BIN` | auto (`python3`, `python`, `py`) | Python used to syntax-check Python answers; check is skipped if none is found |
 | `SARVAM_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | empty | provider keys |
 | `OLLAMA_URL` | empty | set to e.g. `http://127.0.0.1:11434` to count Ollama as available |
 
@@ -422,7 +429,7 @@ At startup, saved keys override `.env` keys and saved models replace `DEFAULT_MO
 
 ## 14. Known limitations and open issues (true as of commit `a2314e4`)
 
-1. **The revision loop is never used from the UI.** `revisionSettings` is never sent. (The LLM judge is now an opt-in Workspace checkbox for both modes. Direct API callers that omit `options.enableLLMJudge` still get `'degraded'` rather than `'deterministic_only'`.)
+1. **The revision loop is never used from the UI.** `revisionSettings` is never sent. (The LLM judge is an opt-in Workspace checkbox for both modes.)
 2. **The "Llama 3.3 70B (Groq)" label is wrong.** `callGroq` sends `model: 'openai/gpt-oss-120b'`, so the UI, recommendations and benchmark profile describe a different model than the one answering. Either change the call to `llama-3.3-70b-versatile` or rename the catalog entry (id, name, benchmarks) consistently.
 3. **Legal Analyzer is a mock.** `LegalAnalyzer.jsx` waits 1 s and shows hard-coded results; it calls no API.
 4. **Benchmark data is unverified** and Claude Opus 5.5 has no profile (shown as unranked). Capability numbers in `models.js` are also hand-set.

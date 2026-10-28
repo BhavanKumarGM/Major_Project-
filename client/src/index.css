@@ -46,6 +46,53 @@
   --shadow-md: 0 8px 24px -4px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 16px 40px -8px rgba(0, 0, 0, 0.7);
   --shadow-glow: 0 0 25px var(--accent-glow);
+  color-scheme: dark;
+}
+
+/* Light theme. Components write theme-dependent colors as var(--token, <dark value>),
+   so these tokens are defined only here and dark mode keeps its original values. */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-primary: #f5f7fb;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #eef1f7;
+  --bg-surface: rgba(255, 255, 255, 0.88);
+  --bg-surface-hover: rgba(241, 245, 249, 0.96);
+  --bg-glass: rgba(255, 255, 255, 0.8);
+  --bg-glass-border: rgba(15, 23, 42, 0.1);
+
+  --accent-glow: rgba(99, 102, 241, 0.2);
+  --accent-cyan-glow: rgba(6, 182, 212, 0.18);
+  --accent-emerald-glow: rgba(16, 185, 129, 0.18);
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+
+  --border-subtle: rgba(15, 23, 42, 0.08);
+  --border-light: rgba(15, 23, 42, 0.14);
+  --border-focus: rgba(99, 102, 241, 0.55);
+
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 6px 18px -4px rgba(15, 23, 42, 0.12);
+  --shadow-lg: 0 14px 32px -8px rgba(15, 23, 42, 0.16);
+
+  /* Channels for translucent layers: white veils become slate tints, dark wells and navy panels become white */
+  --overlay-rgb: 15, 23, 42;
+  --shade-rgb: 255, 255, 255;
+  --surface-rgb: 255, 255, 255;
+
+  --text-strong: #0f172a;
+  --text-body: #334155;
+  --code-bg: #f1f4f9;
+  --tint-emerald: #047857;
+  --tint-rose: #be123c;
+  --tint-cyan: #0e7490;
+  --tint-amber: #b45309;
+  --tint-indigo: #4338ca;
+  --tint-purple: #7e22ce;
 }
 
 * {
@@ -90,11 +137,11 @@ body::before {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(var(--overlay-rgb, 255, 255, 255), 0.15);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(var(--overlay-rgb, 255, 255, 255), 0.3);
 }
 
 /* Typography */
@@ -115,7 +162,7 @@ a {
   transition: color 0.2s ease;
 }
 a:hover {
-  color: #38bdf8;
+  color: var(--tint-cyan, #38bdf8);
 }
 
 /* Layout Utilities */
@@ -144,7 +191,7 @@ a:hover {
 }
 
 .glass-card {
-  background: rgba(19, 27, 42, 0.6);
+  background: rgba(var(--surface-rgb, 19, 27, 42), 0.6);
   backdrop-filter: blur(12px);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -155,7 +202,7 @@ a:hover {
   background: var(--bg-surface-hover);
   border-color: var(--border-light);
   transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 10px 30px rgba(var(--shade-rgb, 0, 0, 0), 0.4);
 }
 
 /* Buttons */
@@ -190,13 +237,13 @@ a:hover {
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(var(--overlay-rgb, 255, 255, 255), 0.05);
   color: var(--text-primary);
   border: 1px solid var(--border-light);
 }
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(var(--overlay-rgb, 255, 255, 255), 0.1);
+  border-color: rgba(var(--overlay-rgb, 255, 255, 255), 0.25);
 }
 
 .btn-cyan {
@@ -225,7 +272,7 @@ a:hover {
 }
 .btn-icon:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--overlay-rgb, 255, 255, 255), 0.08);
 }
 
 /* Badges & Chips */
@@ -242,37 +289,37 @@ a:hover {
 
 .badge-indigo {
   background: rgba(99, 102, 241, 0.15);
-  color: #a5b4fc;
+  color: var(--tint-indigo, #a5b4fc);
   border: 1px solid rgba(99, 102, 241, 0.3);
 }
 
 .badge-cyan {
   background: rgba(6, 182, 212, 0.15);
-  color: #67e8f9;
+  color: var(--tint-cyan, #67e8f9);
   border: 1px solid rgba(6, 182, 212, 0.3);
 }
 
 .badge-emerald {
   background: rgba(16, 185, 129, 0.15);
-  color: #6ee7b7;
+  color: var(--tint-emerald, #6ee7b7);
   border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
 .badge-amber {
   background: rgba(245, 158, 11, 0.15);
-  color: #fcd34d;
+  color: var(--tint-amber, #fcd34d);
   border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 .badge-purple {
   background: rgba(168, 85, 247, 0.15);
-  color: #d8b4fe;
+  color: var(--tint-purple, #d8b4fe);
   border: 1px solid rgba(168, 85, 247, 0.3);
 }
 
 .badge-rose {
   background: rgba(244, 63, 94, 0.15);
-  color: #fda4af;
+  color: var(--tint-rose, #fda4af);
   border: 1px solid rgba(244, 63, 94, 0.3);
 }
 
@@ -318,7 +365,7 @@ a:hover {
 }
 
 .shimmer-text {
-  background: linear-gradient(90deg, #fff 0%, #818cf8 25%, #06b6d4 50%, #818cf8 75%, #fff 100%);
+  background: linear-gradient(90deg, var(--text-strong, #fff) 0%, var(--tint-indigo, #818cf8) 25%, #06b6d4 50%, var(--tint-indigo, #818cf8) 75%, var(--text-strong, #fff) 100%);
   background-size: 200% auto;
   color: transparent;
   -webkit-background-clip: text;
@@ -328,13 +375,13 @@ a:hover {
 
 /* Markdown Content Styling */
 .markdown-body {
-  color: #e2e8f0;
+  color: var(--text-strong, #e2e8f0);
   line-height: 1.7;
 }
 .markdown-body h1, .markdown-body h2, .markdown-body h3 {
   margin-top: 1.25rem;
   margin-bottom: 0.6rem;
-  color: #fff;
+  color: var(--text-strong, #fff);
 }
 .markdown-body h1 { font-size: 1.35rem; }
 .markdown-body h2 { font-size: 1.2rem; }
@@ -353,7 +400,7 @@ a:hover {
   font-style: italic;
 }
 .markdown-body pre {
-  background: #090d16 !important;
+  background: var(--code-bg, #090d16) !important;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 1rem;
@@ -364,7 +411,7 @@ a:hover {
 }
 .markdown-body code:not(pre code) {
   background: rgba(99, 102, 241, 0.15);
-  color: #c7d2fe;
+  color: var(--tint-indigo, #c7d2fe);
   padding: 0.15rem 0.4rem;
   border-radius: 4px;
   font-family: var(--font-mono);
@@ -375,7 +422,7 @@ a:hover {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(var(--shade-rgb, 0, 0, 0), 0.75);
   backdrop-filter: blur(8px);
   z-index: 1000;
   display: flex;
@@ -389,7 +436,7 @@ a:hover {
   background: var(--bg-secondary);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-xl);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), var(--shadow-glow);
+  box-shadow: 0 25px 50px -12px rgba(var(--shade-rgb, 0, 0, 0), 0.8), var(--shadow-glow);
   width: 100%;
   max-width: 700px;
   max-height: 90vh;

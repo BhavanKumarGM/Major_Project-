@@ -196,6 +196,29 @@ class MemoryService {
   }
 
   /**
+   * Replaces a turn's Critic evaluation (e.g. after the user re-checks it with the LLM judge)
+   * and moves the critic-win count to the new winner
+   */
+  setCriticEvaluation(conversationId, turnId, criticEvaluation) {
+    const conv = this.conversations.get(conversationId);
+    const turn = conv?.turns.find(t => t.turnId === turnId);
+    if (!turn) return null;
+
+    const oldWinner = turn.criticEvaluation?.winner?.modelId;
+    const newWinner = criticEvaluation?.winner?.modelId;
+    if (oldWinner !== newWinner) {
+      if (oldWinner && this.analytics.criticWins[oldWinner] > 0) this.analytics.criticWins[oldWinner] -= 1;
+      if (newWinner) this.analytics.criticWins[newWinner] = (this.analytics.criticWins[newWinner] || 0) + 1;
+    }
+
+    turn.criticEvaluation = criticEvaluation;
+    turn.reevaluatedAt = new Date().toISOString();
+    conv.updatedAt = turn.reevaluatedAt;
+    this.persist();
+    return turn;
+  }
+
+  /**
    * Retrieves clean provider-neutral message history along the active branches
    */
   getActiveHistoryContext(conversationId) {
@@ -210,18 +233,20 @@ class MemoryService {
       if (turn.selectedModelId === 'synthesis' && turn.synthesis) {
         chosenText = turn.synthesis.text;
       } else {
-        const resp = turn.responses.find(r => r.modelId === turn.selectedModelId) || turn.responses[0];
-        // Provider error text is not an answer; leave the failed exchange out of history
-        if (!resp || resp.status === 'error') {
-          context.pop();
-          continue;
-        }
-        chosenText = resp.text;
+        const usable = r => r && r.status !== 'error' && (r.text || '').trim();
+        const chosen = (turn.responses || []).find(r => r.modelId === turn.selectedModelId);
+        // Provider error text is not an answer: fall back to another model's answer from the same turn
+        const resp = usable(chosen) ? chosen : (turn.responses || []).find(usable);
+        chosenText = resp ? resp.text : '';
       }
 
-      if (chosenText) {
-        context.push({ role: 'assistant', content: chosenText });
-      }
+      // The user's message stays in history even when no answer came back, so follow-ups such as
+      // "rerun it" or "try again" still know what was asked. A short note (not an invented answer)
+      // keeps user/assistant turns alternating, which some providers require.
+      context.push({
+        role: 'assistant',
+        content: chosenText || '[No answer was produced for this message: the request to the AI provider failed.]'
+      });
     }
     return context;
   }

@@ -76,7 +76,9 @@ function requireAdmin(req, res, next) {
 app.get('/api/models', (req, res) => {
   res.json({
     models: configuredModels,
-    criticWeights
+    criticWeights,
+    // Which models can answer live right now (kept out of the model objects so Settings never saves it)
+    availability: Object.fromEntries(configuredModels.map(m => [m.id, llmService.hasCredentials(m.id)]))
   });
 });
 
@@ -411,6 +413,37 @@ app.post('/api/conversations/:id/synthesis', (req, res) => {
   const turn = memoryService.setSynthesis(req.params.id, turnId, synthesis);
   if (!turn) return res.status(404).json({ error: 'Turn not found' });
   res.json({ success: true, turn });
+});
+
+// Re-grade a saved turn's answers, e.g. with the LLM judge after rule checks found the answers disagree.
+// Uses the answers stored on the server, never answers sent by the client.
+const turnsBeingEvaluated = new Set();
+app.post('/api/conversations/:id/turns/:turnId/evaluate', async (req, res) => {
+  const { id, turnId } = req.params;
+  const { enableLLMJudge = true, judgeModel } = req.body || {};
+  const turn = memoryService.getConversation(id)?.turns.find(t => t.turnId === turnId);
+  if (!turn) return res.status(404).json({ error: 'Turn or conversation not found' });
+  if (judgeModel && !configuredModels.some(m => m.id === judgeModel)) {
+    return res.status(400).json({ error: `Unknown judge model "${judgeModel}".`, code: 'invalid_model' });
+  }
+  if (turnsBeingEvaluated.has(turnId)) {
+    return res.status(409).json({ error: 'This turn is already being evaluated.', code: 'turn_busy' });
+  }
+
+  turnsBeingEvaluated.add(turnId);
+  try {
+    const evaluation = await evaluateResponses(turn.userPrompt, turn.refinedPrompt, turn.responses || [], criticWeights, {
+      analysis: turn.analysis || {},
+      options: { enableLLMJudge: Boolean(enableLLMJudge), ...(judgeModel ? { judgeModel } : {}) },
+      llmService
+    });
+    const updated = memoryService.setCriticEvaluation(id, turnId, evaluation);
+    res.json({ success: true, turn: updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    turnsBeingEvaluated.delete(turnId);
+  }
 });
 
 app.put('/api/conversations/:id/title', (req, res) => {

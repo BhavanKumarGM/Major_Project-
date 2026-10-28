@@ -397,7 +397,7 @@ export default function PromptAnalysisPanel({
                 </p>
 
                 {/* Primary Benchmarks List */}
-                <div style={{ marginTop: '0.6rem', padding: '0.5rem', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', fontSize: '0.72rem' }}>
+                <div style={{ marginTop: '0.6rem', padding: '0.5rem', background: 'rgba(var(--shade-rgb, 0,0,0),0.3)', borderRadius: '6px', fontSize: '0.72rem' }}>
                   <div style={{ fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                     Active Benchmark Suite:
                   </div>
@@ -420,7 +420,7 @@ export default function PromptAnalysisPanel({
                     <span className="rec-provider">{benchmarkData.topRankedModel.provider}</span>
                   </div>
                   <h4 className="rec-model-name">{benchmarkData.topRankedModel.name}</h4>
-                  <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#fbbf24', margin: '0.2rem 0' }}>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--tint-amber, #fbbf24)', margin: '0.2rem 0' }}>
                     {benchmarkData.topRankedModel.compositeScore}<span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/100 Composite</span>
                   </div>
                   <p className="rec-reason">{benchmarkData.topRankedModel.keyStrength}</p>
@@ -466,7 +466,7 @@ export default function PromptAnalysisPanel({
                       </div>
                     </div>
                     <div className="model-right">
-                      <span className="score-num" style={m.rank === 1 ? { color: '#fbbf24' } : {}}>{m.compositeScore}</span>
+                      <span className="score-num" style={m.rank === 1 ? { color: 'var(--tint-amber, #fbbf24)' } : {}}>{m.compositeScore}</span>
                       <button 
                         className="btn btn-secondary btn-xs"
                         onClick={() => onSelectRecommendedModels([m.modelId])}
@@ -494,7 +494,7 @@ export default function PromptAnalysisPanel({
           flex-direction: column;
           height: 100%;
           border-left: 1px solid var(--border-subtle);
-          background: rgba(13, 18, 28, 0.95);
+          background: rgba(var(--surface-rgb, 13, 18, 28), 0.95);
           overflow-y: auto;
           position: relative;
         }
@@ -521,7 +521,7 @@ export default function PromptAnalysisPanel({
           padding: 0.5rem 0.85rem;
           gap: 0.35rem;
           border-bottom: 1px solid var(--border-subtle);
-          background: rgba(0, 0, 0, 0.2);
+          background: rgba(var(--shade-rgb, 0, 0, 0), 0.2);
         }
         .panel-tab {
           flex: 1;
@@ -542,10 +542,10 @@ export default function PromptAnalysisPanel({
         }
         .panel-tab:hover {
           color: var(--text-primary);
-          background: rgba(255, 255, 255, 0.04);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.04);
         }
         .panel-tab.active {
-          color: #fff;
+          color: var(--text-strong, #fff);
           background: rgba(99, 102, 241, 0.15);
           border-color: rgba(99, 102, 241, 0.3);
         }
@@ -567,7 +567,7 @@ export default function PromptAnalysisPanel({
         .intent-meter {
           height: 6px;
           border-radius: 3px;
-          background: rgba(255, 255, 255, 0.08);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.08);
           overflow: hidden;
           display: flex;
           margin-bottom: 0.5rem;
@@ -614,7 +614,7 @@ export default function PromptAnalysisPanel({
           gap: 0.4rem;
           font-size: 0.8rem;
           font-weight: 700;
-          color: #fff;
+          color: var(--text-strong, #fff);
         }
         .card-actions {
           display: flex;
@@ -624,8 +624,8 @@ export default function PromptAnalysisPanel({
           white-space: pre-wrap;
           word-break: break-word;
           font-size: 0.8rem;
-          color: #e2e8f0;
-          background: rgba(0, 0, 0, 0.35) !important;
+          color: var(--text-strong, #e2e8f0);
+          background: rgba(var(--shade-rgb, 0, 0, 0), 0.35) !important;
           border: 1px solid var(--border-subtle);
           border-radius: var(--radius-sm);
           padding: 0.75rem;
@@ -640,7 +640,7 @@ export default function PromptAnalysisPanel({
           background: rgba(148, 163, 184, 0.15);
           color: var(--text-secondary);
         }
-        .method-tag.method-ai { background: rgba(6, 182, 212, 0.15); color: #67e8f9; }
+        .method-tag.method-ai { background: rgba(6, 182, 212, 0.15); color: var(--tint-cyan, #67e8f9); }
         .corrections-row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.4rem 0; }
         .correction-chip {
           font-size: 0.72rem;
@@ -648,11 +648,11 @@ export default function PromptAnalysisPanel({
           border-radius: var(--radius-full);
           background: rgba(16, 185, 129, 0.12);
           border: 1px solid rgba(16, 185, 129, 0.3);
-          color: #6ee7b7;
+          color: var(--tint-emerald, #6ee7b7);
         }
         .correction-chip s { color: var(--text-muted); }
-        .correction-chip.chip-flag { background: rgba(245, 158, 11, 0.12); border-color: rgba(245, 158, 11, 0.3); color: #fcd34d; }
-        .ai-note { font-size: 0.74rem; color: #fcd34d; margin: 0.35rem 0; }
+        .correction-chip.chip-flag { background: rgba(245, 158, 11, 0.12); border-color: rgba(245, 158, 11, 0.3); color: var(--tint-amber, #fcd34d); }
+        .ai-note { font-size: 0.74rem; color: var(--tint-amber, #fcd34d); margin: 0.35rem 0; }
         .improvements-list {
           margin-top: 0.75rem;
           background: rgba(16, 185, 129, 0.05);
@@ -663,7 +663,7 @@ export default function PromptAnalysisPanel({
         .imp-title {
           font-size: 0.75rem;
           font-weight: 700;
-          color: #6ee7b7;
+          color: var(--tint-emerald, #6ee7b7);
           display: block;
           margin-bottom: 0.35rem;
         }
@@ -693,10 +693,10 @@ export default function PromptAnalysisPanel({
         }
         .edit-textarea {
           width: 100%;
-          background: rgba(0, 0, 0, 0.4);
+          background: rgba(var(--shade-rgb, 0, 0, 0), 0.4);
           border: 1px solid var(--border-focus);
           border-radius: var(--radius-sm);
-          color: #fff;
+          color: var(--text-strong, #fff);
           font-family: var(--font-sans);
           font-size: 0.8rem;
           padding: 0.5rem;
@@ -727,7 +727,7 @@ export default function PromptAnalysisPanel({
         }
         .bd-value {
           font-size: 0.8rem;
-          color: #f1f5f9;
+          color: var(--text-strong, #f1f5f9);
         }
         .top-rec-card {
           border-color: rgba(16, 185, 129, 0.3);
@@ -788,7 +788,7 @@ export default function PromptAnalysisPanel({
         .model-name-text {
           font-size: 0.8rem;
           font-weight: 700;
-          color: #fff;
+          color: var(--text-strong, #fff);
         }
         .model-rationale-text {
           font-size: 0.7rem;

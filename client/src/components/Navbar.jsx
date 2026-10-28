@@ -1,7 +1,18 @@
-import React from 'react';
-import { Sparkles, Layers, BarChart3, Settings, ShieldCheck, Scale, Cpu, Award } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Sparkles, Layers, BarChart3, Settings, ShieldCheck, Scale, Cpu, Award, Sun, Moon } from 'lucide-react';
 
 export default function Navbar({ activeView, setActiveView, onOpenSettings }) {
+  // index.html applies the saved theme before first paint; this keeps it in sync after toggling
+  const [theme, setTheme] = useState(() => document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
+
+  useEffect(() => {
+    if (theme === 'light') document.documentElement.dataset.theme = 'light';
+    else delete document.documentElement.dataset.theme;
+    try { localStorage.setItem('hiveTheme', theme); } catch (e) { /* storage blocked: theme lasts for this visit only */ }
+  }, [theme]);
+
+  const nextTheme = theme === 'light' ? 'dark' : 'light';
+
   return (
     <header className="navbar-container">
       <div className="navbar-inner">
@@ -57,7 +68,15 @@ export default function Navbar({ activeView, setActiveView, onOpenSettings }) {
 
         {/* Right Actions */}
         <div className="nav-actions">
-          <button 
+          <button
+            className="btn btn-secondary btn-sm theme-toggle"
+            onClick={() => setTheme(nextTheme)}
+            title={`Switch to ${nextTheme} mode`}
+            aria-label={`Switch to ${nextTheme} mode`}
+          >
+            {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+          </button>
+          <button
             className="btn btn-secondary btn-sm"
             onClick={onOpenSettings}
             title="Configure API Keys & Model Profiles"
@@ -80,7 +99,7 @@ export default function Navbar({ activeView, setActiveView, onOpenSettings }) {
           position: sticky;
           top: 0;
           z-index: 100;
-          background: rgba(7, 9, 14, 0.85);
+          background: rgba(var(--surface-rgb, 7, 9, 14), 0.85);
           backdrop-filter: blur(16px);
           -webkit-backdrop-filter: blur(16px);
           border-bottom: 1px solid var(--border-subtle);
@@ -127,7 +146,7 @@ export default function Navbar({ activeView, setActiveView, onOpenSettings }) {
           font-weight: 800;
           font-size: 1.15rem;
           letter-spacing: -0.01em;
-          background: linear-gradient(90deg, #fff, #c7d2fe);
+          background: linear-gradient(90deg, var(--text-strong, #fff), var(--tint-indigo, #c7d2fe));
           -webkit-background-clip: text;
           background-clip: text;
           color: transparent;
@@ -161,10 +180,10 @@ export default function Navbar({ activeView, setActiveView, onOpenSettings }) {
         }
         .nav-btn:hover {
           color: var(--text-primary);
-          background: rgba(255, 255, 255, 0.05);
+          background: rgba(var(--overlay-rgb, 255, 255, 255), 0.05);
         }
         .nav-btn.active {
-          color: #fff;
+          color: var(--text-strong, #fff);
           background: rgba(99, 102, 241, 0.15);
           border-color: rgba(99, 102, 241, 0.3);
         }

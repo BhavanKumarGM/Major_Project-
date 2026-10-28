@@ -12,6 +12,8 @@ export default function App() {
   const [activeView, setActiveView] = useState('landing'); // 'landing' | 'workspace' | 'benchmark' | 'dashboard' | 'legal'
   const [models, setModels] = useState([]);
   const [criticWeights, setCriticWeights] = useState({});
+  // modelId -> whether the server has credentials for it
+  const [modelAvailability, setModelAvailability] = useState({});
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [initialPromptForWorkspace, setInitialPromptForWorkspace] = useState('');
   const [initialModelsForWorkspace, setInitialModelsForWorkspace] = useState(null);
@@ -26,6 +28,7 @@ export default function App() {
       const data = await api.getModels();
       if (data.models) setModels(data.models);
       if (data.criticWeights) setCriticWeights(data.criticWeights);
+      if (data.availability) setModelAvailability(data.availability);
     } catch (err) {
       console.error('Failed to load models:', err);
     }
@@ -60,6 +63,7 @@ export default function App() {
         {activeView === 'workspace' && (
           <Workspace 
             models={models}
+            modelAvailability={modelAvailability}
             criticWeights={criticWeights}
             initialPrompt={initialPromptForWorkspace}
             initialModelIds={initialModelsForWorkspace}
@@ -89,7 +93,11 @@ export default function App() {
       {/* Settings & Configuration Modal */}
       <SettingsModal 
         isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
+        onClose={() => {
+          setIsSettingsOpen(false);
+          // Keys may have been added or removed; refresh which models can answer
+          loadModels();
+        }}
         models={models}
         onSaveModels={(updated) => setModels(updated)}
         criticWeights={criticWeights}

@@ -254,6 +254,16 @@ export const api = {
     return handleResponse(res);
   },
 
+  // Re-grades a saved turn on the server; with enableLLMJudge this makes one billable judge call per answer
+  async reevaluateTurn(conversationId, turnId, { enableLLMJudge = true } = {}) {
+    const res = await fetch(`${BASE_URL}/conversations/${conversationId}/turns/${turnId}/evaluate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enableLLMJudge })
+    });
+    return handleResponse(res);
+  },
+
   async saveSynthesis(conversationId, turnId, synthesis) {
     const res = await fetch(`${BASE_URL}/conversations/${conversationId}/synthesis`, {
       method: 'POST',
