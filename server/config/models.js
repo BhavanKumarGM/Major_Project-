@@ -40,12 +40,13 @@ export const DEFAULT_MODELS = [
     isRecommendedDefault: true
   },
   {
+    // Id kept for saved chats and settings; Groq stopped serving Llama chat models, so this runs GPT-OSS 120B
     id: "llama-3-3-70b",
-    name: "Llama 3.3 70B (Groq)",
+    name: "GPT-OSS 120B (Groq)",
     provider: "Groq",
     avatar: "⚡",
     badgeColor: "#f97316",
-    description: "Blazing-fast open-weight powerhouse optimized for real-time coding and reasoning.",
+    description: "OpenAI's open-weight 120B reasoning model, served on Groq's low-latency hardware.",
     contextWindow: "128k tokens",
     latencyAvg: 380,
     capabilities: {
@@ -128,3 +129,24 @@ export const DEFAULT_CRITIC_WEIGHTS = {
   clarity: 0.15,
   instructionFollowing: 0.10
 };
+
+// Labels that were wrong in earlier versions and are corrected in saved settings and conversations on load.
+// The "llama-3-3-70b" id has always run GPT-OSS 120B on Groq; only its label said Llama.
+export const RENAMED_MODEL_TEXT = {
+  'Llama 3.3 70B (Groq)': 'GPT-OSS 120B (Groq)',
+  'Blazing-fast open-weight powerhouse optimized for real-time coding and reasoning.': "OpenAI's open-weight 120B reasoning model, served on Groq's low-latency hardware.",
+  'Fast execution with strong open-weight logic and efficient step-by-step reasoning.': 'Open-weight reasoning model (GPT-OSS 120B) with fast responses on Groq.'
+};
+
+// Returns a copy of saved data with old labels replaced (exact text only); unchanged data is returned as is
+export function applyModelRenames(data) {
+  if (data == null) return data;
+  let json = JSON.stringify(data);
+  const before = json;
+  for (const [from, to] of Object.entries(RENAMED_MODEL_TEXT)) {
+    const encFrom = JSON.stringify(from).slice(1, -1);
+    const encTo = JSON.stringify(to).slice(1, -1);
+    json = json.split(encFrom).join(encTo);
+  }
+  return json === before ? data : JSON.parse(json);
+}

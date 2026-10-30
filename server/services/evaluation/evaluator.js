@@ -25,6 +25,8 @@ function applyIssuePenalty(iss, s) {
       return { ...s, completeness: s.completeness - (critical ? 30 : 10) };
     case 'off_topic':
       return { ...s, relevance: s.relevance - 50, correctness: s.correctness - 20 };
+    case 'incomplete_response':
+      return { ...s, completeness: s.completeness - (critical ? 40 : 25) };
     default:
       return s;
   }

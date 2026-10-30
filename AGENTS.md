@@ -136,7 +136,7 @@ Defined in [server/config/models.js](server/config/models.js). The **`id` is the
 |---|---|---|---|---|---|
 | `sarvam-105b` | Sarvam 105B | Sarvam AI | `SARVAM_API_KEY` (header `api-subscription-key`) | `sarvam-105b` | yes |
 | `gemini-2-5-flash` | Gemini 2.5 Flash | Google | `GEMINI_API_KEY` (header `x-goog-api-key`) | `gemini-2.5-flash` | yes |
-| `llama-3-3-70b` | Llama 3.3 70B (Groq) | Groq | `GROQ_API_KEY` | **`openai/gpt-oss-120b`** (not Llama; see §14) | yes |
+| `llama-3-3-70b` | GPT-OSS 120B (Groq) | Groq | `GROQ_API_KEY` | `openai/gpt-oss-120b` (`GROQ_MODEL` overrides). The id is historical: Groq no longer serves Llama chat models. Old "Llama 3.3 70B (Groq)" labels in saved settings/chats are corrected on load (`applyModelRenames`). No benchmark profile, so the ranker lists it as unranked. | yes |
 | `gpt-4o` | GPT-4o | OpenAI | `OPENAI_API_KEY` | `gpt-4o` | no |
 | `claude-opus-5-5` | Claude Opus 5.5 | Anthropic | `ANTHROPIC_API_KEY` | `claude-opus-5-5` | no |
 | `ollama-local` | Ollama (Local) | Local | `OLLAMA_URL` | `llama3` via `/api/chat` | no |
@@ -430,7 +430,7 @@ At startup, saved keys override `.env` keys and saved models replace `DEFAULT_MO
 ## 14. Known limitations and open issues (true as of commit `a2314e4`)
 
 1. **The revision loop is never used from the UI.** `revisionSettings` is never sent. (The LLM judge is an opt-in Workspace checkbox for both modes.)
-2. **The "Llama 3.3 70B (Groq)" label is wrong.** `callGroq` sends `model: 'openai/gpt-oss-120b'`, so the UI, recommendations and benchmark profile describe a different model than the one answering. Either change the call to `llama-3.3-70b-versatile` or rename the catalog entry (id, name, benchmarks) consistently.
+2. **Cut-off answers.** Providers report when an answer hit the output limit (`truncated: true`; finish_reason `length`, Gemini `MAX_TOKENS`, Claude `max_tokens`, Ollama `done_reason: length`). The critic marks it as an incomplete response and the UI shows a "Cut off" badge; an empty cut-off answer is an error. Sarvam asks for `SARVAM_MAX_TOKENS` (8192) because it reasons before answering and its 2048 default cut answers off.
 3. **Legal Analyzer is a mock.** `LegalAnalyzer.jsx` waits 1 s and shows hard-coded results; it calls no API.
 4. **Benchmark data is unverified** and Claude Opus 5.5 has no profile (shown as unranked). Capability numbers in `models.js` are also hand-set.
 5. **No authentication or users.** `ADMIN_TOKEN` only guards settings and keys; conversations are global to the server. Keys in `server/data/keys.json` are plain text.

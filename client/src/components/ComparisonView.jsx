@@ -518,6 +518,9 @@ export default function ComparisonView({
                       {resp.status === 'error' && (
                         <span className="badge badge-rose badge-xs" title={resp.errorMessage}>Error</span>
                       )}
+                      {resp.truncated && resp.status !== 'error' && (
+                        <span className="badge badge-amber badge-xs" title="The model hit its output limit, so the end of this answer is missing.">Cut off</span>
+                      )}
                       {resp.revisionAttempt && (
                         <span className="badge badge-indigo badge-xs">Revision v{resp.revisionAttempt}</span>
                       )}

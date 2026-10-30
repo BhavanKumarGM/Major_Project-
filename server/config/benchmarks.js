@@ -189,36 +189,8 @@ export const MODEL_BENCHMARKS = {
     standoutBadge: 'Long-Context & Speed',
     keyStrength: 'Leads RULER benchmark (96.8%) with an expansive 1M context window and rapid 650ms average latency.'
   },
-  'llama-3-3-70b': {
-    name: 'Llama 3.3 70B (Groq)',
-    provider: 'Groq',
-    scores: {
-      humaneval: 81.7,
-      swebench: 30.0,
-      mbpp: 82.4,
-      gsm8k: 92.1,
-      math: 69.8,
-      gpqa: 50.0,
-      indicllm: 68.0,
-      bhashaeval: 69.5,
-      flores: 84.0,
-      mmlupro: 68.3,
-      arenaelo: 1238,
-      arc: 92.8,
-      ruler: 89.0,
-      qmsum: 87.5,
-      faithfulness: 90.0,
-      mtbench: 8.4,
-      creativeelo: 1215,
-      variety: 88.0,
-      ifeval: 80.5,
-      jsonformat: 91.5,
-      negativecon: 85.0
-    },
-    standoutCategory: 'knowledge',
-    standoutBadge: 'Fast Open Weight',
-    keyStrength: 'Near-flagship performance at 380ms on Groq hardware with strong open-weights community validation.'
-  },
+  // 'llama-3-3-70b' has no profile: Groq now serves GPT-OSS 120B under that id, and the Llama 3.3 70B
+  // scores that used to be here do not describe it. The ranker lists it as unranked.
   'ollama-local': {
     name: 'Ollama (Local)',
     provider: 'Local AI',

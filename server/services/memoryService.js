@@ -5,6 +5,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { loadState, saveState } from './persistenceService.js';
+import { applyModelRenames } from '../config/models.js';
 
 class MemoryService {
   constructor() {
@@ -31,7 +32,8 @@ class MemoryService {
   }
 
   load() {
-    const saved = loadState('memory', null);
+    // Old turns keep the model labels of the time; correct ones that were wrong
+    const saved = applyModelRenames(loadState('memory', null));
     if (!saved) return;
     for (const conv of saved.conversations || []) {
       this.conversations.set(conv.id, conv);

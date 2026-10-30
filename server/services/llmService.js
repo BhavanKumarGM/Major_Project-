@@ -5,6 +5,9 @@
  * configured providers that fail report an error instead of fake output.
  */
 
+// Sarvam 105B spends part of its output budget on reasoning; its 2048-token default cut answers off
+const SARVAM_MAX_TOKENS = Number(process.env.SARVAM_MAX_TOKENS) || 8192;
+
 const SECRET_PATTERNS = [/sk-[A-Za-z0-9_*-]{6,}/g, /gsk_[A-Za-z0-9_*]{6,}/g, /AIza[A-Za-z0-9_-]{10,}/g];
 
 function providerError(status, message) {
@@ -145,7 +148,9 @@ export class LLMService {
         const result = await liveCall(fullPrompt, conversationContext);
         // A blank reply (e.g. a reasoning model that spent its budget thinking) is not an answer
         if (!String(result?.text || '').trim()) {
-          throw new Error('The model returned an empty answer.');
+          throw new Error(result?.truncated
+            ? 'The model used its whole output limit before writing an answer (it spent it reasoning).'
+            : 'The model returned an empty answer.');
         }
         return { ...result, ...meta, latency: Date.now() - startTime, isLive: true, isSimulated: false };
       } catch (err) {
@@ -259,7 +264,10 @@ export class LLMService {
       body: JSON.stringify({
         model: 'sarvam-105b',
         messages,
-        temperature: 0.7
+        temperature: 0.7,
+        // Sarvam 105B reasons before answering and defaults to 2048 output tokens, which cut answers off
+        // (or left them empty when the reasoning used the whole budget)
+        max_tokens: SARVAM_MAX_TOKENS
       })
     });
 
@@ -271,6 +279,7 @@ export class LLMService {
     const data = await res.json();
     return {
       text: data.choices[0]?.message?.content || '',
+      truncated: data.choices[0]?.finish_reason === 'length',
       tokenUsage: {
         promptTokens: data.usage?.prompt_tokens || 0,
         completionTokens: data.usage?.completion_tokens || 0,
@@ -306,6 +315,7 @@ export class LLMService {
     const data = await res.json();
     return {
       text: data.choices[0]?.message?.content || '',
+      truncated: data.choices[0]?.finish_reason === 'length',
       tokenUsage: {
         promptTokens: data.usage?.prompt_tokens || 0,
         completionTokens: data.usage?.completion_tokens || 0,
@@ -342,6 +352,7 @@ export class LLMService {
 
     return {
       text,
+      truncated: candidate?.finishReason === 'MAX_TOKENS',
       tokenUsage: {
         promptTokens: meta.promptTokenCount || 0,
         completionTokens: meta.candidatesTokenCount || 0,
@@ -355,8 +366,9 @@ export class LLMService {
     const messages = context.map(m => ({ role: m.role, content: m.text || m.content }));
     messages.push({ role: 'user', content: prompt });
 
-    // Use available chat model on Groq
-    const model = 'openai/gpt-oss-120b';
+    // The "llama-3-3-70b" catalog id is kept for saved chats and settings; Groq no longer serves Llama chat
+    // models, so it runs GPT-OSS 120B (labelled as such in config/models.js)
+    const model = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -380,6 +392,7 @@ export class LLMService {
     const data = await res.json();
     return {
       text: data.choices[0]?.message?.content || '',
+      truncated: data.choices[0]?.finish_reason === 'length',
       tokenUsage: {
         promptTokens: data.usage?.prompt_tokens || 0,
         completionTokens: data.usage?.completion_tokens || 0,
@@ -423,6 +436,7 @@ export class LLMService {
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
     return {
       text,
+      truncated: data.stop_reason === 'max_tokens',
       tokenUsage: {
         promptTokens: data.usage?.input_tokens || 0,
         completionTokens: data.usage?.output_tokens || 0,
@@ -452,6 +466,7 @@ export class LLMService {
     const data = await res.json();
     return {
       text: data.message?.content || '',
+      truncated: data.done_reason === 'length',
       tokenUsage: {
         promptTokens: data.prompt_eval_count || 50,
         completionTokens: data.eval_count || 150,

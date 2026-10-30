@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1200" width="100%" height="100%" style="background:#0e1117; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <!-- Arrow marker definition -->
+    <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#60a5fa" />
+    </marker>
+    <!-- Card shadow filter -->
+    <filter id="cardGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <style>
+    .title-text { fill: #f8fafc; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+    .subgraph-box { fill: #131b2e; stroke: #1e293b; stroke-width: 1.5; rx: 12; }
+    .subgraph-title { fill: #94a3b8; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+    .node-pill { fill: #1e293b; stroke: #3b82f6; stroke-width: 1.5; rx: 20; }
+    .node-pill-text { fill: #f8fafc; font-size: 14px; font-weight: 600; text-anchor: middle; }
+    .node-step { fill: #1e293b; stroke: #38bdf8; stroke-width: 1.5; rx: 8; }
+    .node-step-text { fill: #f1f5f9; font-size: 14px; font-weight: 600; text-anchor: middle; }
+    .node-card { fill: #0f172a; stroke: #334155; stroke-width: 1.2; rx: 8; }
+    .node-card:hover { stroke: #60a5fa; fill: #1e293b; }
+    .node-card-title { fill: #f8fafc; font-size: 13px; font-weight: 600; text-anchor: middle; }
+    .node-card-sub { fill: #94a3b8; font-size: 11px; font-weight: 400; text-anchor: middle; }
+    .flow-line { fill: none; stroke: #60a5fa; stroke-width: 1.8; marker-end: url(#arrow); }
+  </style>
+
+  <!-- Document Title -->
+  <text x="50" y="45" class="title-text">1. System Architecture &amp; High-Level Flow</text>
+
+  <!-- ==================== USER INPUT NODE ==================== -->
+  <rect x="400" y="70" width="200" height="42" class="node-pill" filter="url(#cardGlow)" />
+  <text x="500" y="96" class="node-pill-text">User Prompt Input</text>
+
+  <!-- Arrow: Input -> PreFlight -->
+  <path d="M 500 112 L 500 148" class="flow-line" />
+
+  <!-- ==================== PRE-FLIGHT PIPELINE ==================== -->
+  <rect x="50" y="150" width="900" height="230" class="subgraph-box" />
+  <text x="75" y="180" class="subgraph-title">Pre-Flight Pipeline</text>
+
+  <!-- Step 1 -->
+  <rect x="360" y="195" width="280" height="40" class="node-step" />
+  <text x="500" y="220" class="node-step-text">1. Pre-Flight Analysis &amp; Prep</text>
+
+  <!-- Arrows from Step 1 to 3 Engines -->
+  <path d="M 430 235 L 200 270" class="flow-line" />
+  <path d="M 500 235 L 500 270" class="flow-line" />
+  <path d="M 570 235 L 800 270" class="flow-line" />
+
+  <!-- Engine 1: Analysis -->
+  <rect x="75" y="275" width="250" height="75" class="node-card" filter="url(#cardGlow)" />
+  <text x="200" y="308" class="node-card-title">Analysis Engine</text>
+  <text x="200" y="328" class="node-card-sub">Category, Constraints &amp; Ambiguity</text>
+
+  <!-- Engine 2: Refinement -->
+  <rect x="375" y="275" width="250" height="75" class="node-card" filter="url(#cardGlow)" />
+  <text x="500" y="308" class="node-card-title">Refinement Engine</text>
+  <text x="500" y="328" class="node-card-sub">Intent-Preserving Optimizer</text>
+
+  <!-- Engine 3: Recommendation -->
+  <rect x="675" y="275" width="250" height="75" class="node-card" filter="url(#cardGlow)" />
+  <text x="800" y="308" class="node-card-title">Recommendation Engine</text>
+  <text x="800" y="328" class="node-card-sub">0–100% Capability Match Scores</text>
+
+  <!-- Arrow: Pre-Flight -> Multi-Model Arena -->
+  <path d="M 500 380 L 500 418" class="flow-line" />
+
+  <!-- ==================== MULTI-MODEL ARENA ==================== -->
+  <rect x="50" y="420" width="900" height="230" class="subgraph-box" />
+  <text x="75" y="450" class="subgraph-title">Multi-Model Arena</text>
+
+  <!-- Step 2 -->
+  <rect x="360" y="465" width="280" height="40" class="node-step" />
+  <text x="500" y="490" class="node-step-text">2. Parallel Model Dispatch</text>
+
+  <!-- Arrows from Step 2 to 6 Models -->
+  <path d="M 390 505 L 125 540" class="flow-line" />
+  <path d="M 430 505 L 275 540" class="flow-line" />
+  <path d="M 480 505 L 425 540" class="flow-line" />
+  <path d="M 520 505 L 575 540" class="flow-line" />
+  <path d="M 570 505 L 725 540" class="flow-line" />
+  <path d="M 610 505 L 875 540" class="flow-line" />
+
+  <!-- Model 1: OpenAI -->
+  <rect x="60" y="545" width="130" height="75" class="node-card" filter="url(#cardGlow)" />
+  <text x="125" y="580" class="node-card-title">OpenAI</text>
+  <text x="125" y="598" class="node-card-sub">GPT-4o / mini</text>
+
+  <!-- Model 2: Anthropic -->
+  <rect x="210" y="545" width="130" height="75" class="node-card" filter="url(#cardGlow)" />
+  <text x="275" y="580" class="node-card-title">Anthropic</text>
+  <text x="275" y="598" class="node-card-sub">Claude 3.5 Sonnet</text>
+
+  <!-- Model 3: Gemini -->
+  <rect x="360" y="545" width="130" height="75" class="node-card" filter="url(#cardGlow)" />
+  <text x="425" y="580" class="node-card-title">Google Gemini</text>
+  <text x="425" y="598" class="node-card-sub">2.0 Flash</text>
+
+  <!-- Model 4: Groq -->
+  <rect x="510" y="545" width="130" height="75" class="node-card" filter="url(#cardGlow)" />
+  <text x="575" y="580" class="node-card-title">Groq</text>
+  <text x="575" y="598" class="node-card-sub">Llama 3.3 70B</text>
+
+  <!-- Model 5: Ollama -->
+  <rect x="660" y="545" width="130" height="75" class="node-card" filter="url(#cardGlow)" />
+  <text x="725" y="580" class="node-card-title">Local Ollama</text>
+  <text x="725" y="598" class="node-card-sub">Offline / Private</text>
+
+  <!-- Model 6: Sarvam -->
+  <rect x="810" y="545" width="130" height="75" class="node-card" filter="url(#cardGlow)" />
+  <text x="875" y="580" class="node-card-title">Sarvam AI</text>
+  <text x="875" y="598" class="node-card-sub">105B Indic</text>
+
+  <!-- Arrows from 6 Models to Post-Gen -->
+  <path d="M 125 620 L 400 725" class="flow-line" />
+  <path d="M 275 620 L 440 725" class="flow-line" />
+  <path d="M 425 620 L 480 725" class="flow-line" />
+  <path d="M 575 620 L 520 725" class="flow-line" />
+  <path d="M 725 620 L 560 725" class="flow-line" />
+  <path d="M 875 620 L 600 725" class="flow-line" />
+
+  <!-- ==================== EVALUATION & CONSENSUS ==================== -->
+  <rect x="50" y="685" width="900" height="230" class="subgraph-box" />
+  <text x="75" y="715" class="subgraph-title">Evaluation &amp; Consensus</text>
+
+  <!-- Step 3 -->
+  <rect x="360" y="730" width="280" height="40" class="node-step" />
+  <text x="500" y="755" class="node-step-text">3. Post-Generation Analysis</text>
+
+  <!-- Arrows from Step 3 to Critic and Synthesis -->
+  <path d="M 430 770 L 275 805" class="flow-line" />
+  <path d="M 570 770 L 725 805" class="flow-line" />
+
+  <!-- Critic Engine -->
+  <rect x="100" y="810" width="350" height="75" class="node-card" filter="url(#cardGlow)" />
+  <text x="275" y="842" class="node-card-title">Critic AI Matrix</text>
+  <text x="275" y="862" class="node-card-sub">Correctness, Relevance, Clarity, etc.</text>
+
+  <!-- Synthesis Engine -->
+  <rect x="550" y="810" width="350" height="75" class="node-card" filter="url(#cardGlow)" />
+  <text x="725" y="842" class="node-card-title">Synthesis Engine</text>
+  <text x="725" y="862" class="node-card-sub">Best Elements Consolidated</text>
+
+  <!-- Arrows from Critic and Synthesis to Step 4 -->
+  <path d="M 275 885 L 440 965" class="flow-line" />
+  <path d="M 725 885 L 560 965" class="flow-line" />
+
+  <!-- ==================== SHARED MEMORY & BRANCHING ==================== -->
+  <rect x="350" y="970" width="300" height="45" class="node-step" />
+  <text x="500" y="998" class="node-step-text">4. Shared Memory &amp; Branching</text>
+
+  <!-- Arrow to Active Continuation Branch -->
+  <path d="M 500 1015 L 500 1060" class="flow-line" />
+
+  <rect x="375" y="1065" width="250" height="45" class="node-pill" filter="url(#cardGlow)" />
+  <text x="500" y="1093" class="node-pill-text">Active Continuation Branch</text>
+</svg>

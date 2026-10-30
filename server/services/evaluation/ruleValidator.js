@@ -513,7 +513,22 @@ export function runDeterministicChecks(candidate, promptContext = {}) {
     }
   }
 
-  // 10. Incomplete generation check (unclosed code fences or abrupt cut-off)
+  // 10a. The provider stopped the answer at its output limit
+  if (candidate.truncated) {
+    findings.push({
+      id: 'rule-truncated',
+      rule: 'complete_generation',
+      status: 'fail',
+      severity: 'high',
+      category: 'incomplete_response',
+      description: "The answer was cut off at the model's output limit, so its ending is missing.",
+      evidence: `Response ends: "${text.slice(-80)}"`,
+      likelySource: 'provider_or_execution',
+      recommendedCorrection: 'Ask the model to continue, or raise its output limit.'
+    });
+  }
+
+  // 10b. Incomplete generation check (unclosed code fences or abrupt cut-off)
   const codeFenceCount = (text.match(/```/g) || []).length;
   if (codeFenceCount % 2 !== 0) {
     findings.push({

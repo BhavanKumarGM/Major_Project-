@@ -77,7 +77,7 @@ export function recommendModels(models, analysis, isAvailable = () => true, perf
     } else if (model.id === 'gemini-2-5-flash') {
       rationale = 'Ultra-low latency inference, large context handling, and rapid code generation.';
     } else if (model.id === 'llama-3-3-70b') {
-      rationale = 'Fast execution with strong open-weight logic and efficient step-by-step reasoning.';
+      rationale = 'Open-weight reasoning model (GPT-OSS 120B) with fast responses on Groq.';
     } else if (model.id === 'sarvam-105b') {
       rationale = 'Large multilingual model with strong Indic-language coverage and balanced reasoning and coding profiles.';
     } else if (model.id === 'ollama-local') {

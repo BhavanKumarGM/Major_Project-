@@ -338,7 +338,7 @@ export default function SettingsModal({
                         <span className="badge badge-amber">Offline / Fallback</span>
                       )}
                     </div>
-                    <p className="key-desc">Powers ultra-fast Llama 3.3 70B inference.</p>
+                    <p className="key-desc">Powers GPT-OSS 120B on Groq's fast inference.</p>
                   </div>
                   <div className="key-input-row">
                     <input 

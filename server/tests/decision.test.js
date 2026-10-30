@@ -352,3 +352,71 @@ describe('Conversation memory', () => {
     assert.match(resp.errorMessage, /empty answer/);
   });
 });
+
+describe('Cut-off answers and model labels', () => {
+  // Replaces global fetch for one provider call and records the request body
+  async function withFetch(response, run) {
+    const original = globalThis.fetch;
+    const sent = [];
+    globalThis.fetch = async (url, init) => {
+      sent.push(JSON.parse(init.body));
+      return { ok: true, status: 200, json: async () => response };
+    };
+    try { return { result: await run(), sent }; } finally { globalThis.fetch = original; }
+  }
+  const sarvamModel = { id: 'sarvam-105b', name: 'Sarvam 105B', provider: 'Sarvam AI' };
+
+  it('asks Sarvam for a larger output limit and flags answers cut off at the limit', async () => {
+    const service = new LLMService({ sarvam: 'test-sarvam-key' });
+    const { result, sent } = await withFetch(
+      { choices: [{ message: { content: 'A hash table maps keys to' }, finish_reason: 'length' }], usage: {} },
+      () => service.generateSingle(sarvamModel, 'Explain hash tables')
+    );
+    assert.ok(sent[0].max_tokens >= 8192);
+    assert.strictEqual(result.status, 'success');
+    assert.strictEqual(result.truncated, true);
+  });
+
+  it('reports an answer that is empty because the output limit ran out as an error', async () => {
+    const service = new LLMService({ sarvam: 'test-sarvam-key' });
+    const { result } = await withFetch(
+      { choices: [{ message: { content: '' }, finish_reason: 'length' }], usage: {} },
+      () => service.generateSingle(sarvamModel, 'Explain hash tables')
+    );
+    assert.strictEqual(result.status, 'error');
+    assert.match(result.errorMessage, /output limit/);
+  });
+
+  it('marks a cut-off answer down so a complete one wins', async () => {
+    const { evaluateResponses } = await import('../services/criticEngine.js');
+    const { analyzePrompt } = await import('../services/analysisEngine.js');
+    const prompt = 'Explain how hash tables handle collisions';
+    const text = 'Hash tables handle collisions with chaining, where each bucket holds a list of entries, or open addressing, where the table probes for the next free slot using linear or quadratic probing.';
+    const ev = await evaluateResponses(prompt, '', [
+      { modelId: 'cut', text, status: 'success', isLive: true, truncated: true },
+      { modelId: 'full', text, status: 'success', isLive: true }
+    ], {}, { analysis: analyzePrompt(prompt) });
+    assert.strictEqual(ev.winner.modelId, 'full');
+    assert.ok(ev.evaluations.find(e => e.modelId === 'cut').issues.some(i => /cut off at the model's output limit/.test(i.description)));
+  });
+
+  it('labels the Groq model as GPT-OSS 120B and corrects old saved labels', async () => {
+    const { DEFAULT_MODELS, applyModelRenames } = await import('../config/models.js');
+    assert.strictEqual(DEFAULT_MODELS.find(m => m.id === 'llama-3-3-70b').name, 'GPT-OSS 120B (Groq)');
+
+    const saved = { turns: [{ responses: [{ modelId: 'llama-3-3-70b', modelName: 'Llama 3.3 70B (Groq)' }], reason: 'Llama 3.3 70B (Groq) scored highest (88.4 vs 79).' }] };
+    const fixed = applyModelRenames(saved);
+    assert.strictEqual(fixed.turns[0].responses[0].modelName, 'GPT-OSS 120B (Groq)');
+    assert.match(fixed.turns[0].reason, /^GPT-OSS 120B \(Groq\) scored highest/);
+    const untouched = { name: 'Gemini 2.5 Flash' };
+    assert.strictEqual(applyModelRenames(untouched), untouched);
+  });
+
+  it('lists the Groq model as unranked instead of showing Llama benchmark scores', async () => {
+    const { BenchmarkRankerService } = await import('../services/benchmarkRankerService.js');
+    const { DEFAULT_MODELS } = await import('../config/models.js');
+    const ranking = BenchmarkRankerService.rankModelsForPrompt('Write a Python function to sort a list', DEFAULT_MODELS);
+    assert.ok(ranking.unrankedModels.some(m => m.modelId === 'llama-3-3-70b'));
+    assert.ok(!JSON.stringify(ranking).includes('Llama 3.3'));
+  });
+});

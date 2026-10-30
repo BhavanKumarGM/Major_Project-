@@ -6,7 +6,7 @@ import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import dotenv from 'dotenv';
-import { DEFAULT_MODELS, DEFAULT_CRITIC_WEIGHTS } from './config/models.js';
+import { DEFAULT_MODELS, DEFAULT_CRITIC_WEIGHTS, applyModelRenames } from './config/models.js';
 import { analyzePrompt } from './services/analysisEngine.js';
 import { refinePrompt } from './services/refinementEngine.js';
 import { recommendModels } from './services/recommendationEngine.js';
@@ -47,7 +47,8 @@ const upload = multer({
 // Persisted state (server/data/*.json); keys entered in the UI override .env values
 const savedSettings = loadState('settings', {});
 const savedKeys = loadState('keys', {});
-let configuredModels = Array.isArray(savedSettings.models) ? savedSettings.models : JSON.parse(JSON.stringify(DEFAULT_MODELS));
+// Saved model lists keep their own copy of names; correct labels that earlier versions got wrong
+let configuredModels = Array.isArray(savedSettings.models) ? applyModelRenames(savedSettings.models) : JSON.parse(JSON.stringify(DEFAULT_MODELS));
 let criticWeights = { ...DEFAULT_CRITIC_WEIGHTS, ...(savedSettings.criticWeights || {}) };
 const apiKeys = {
   sarvam: process.env.SARVAM_API_KEY || '',

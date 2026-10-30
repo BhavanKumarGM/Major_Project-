@@ -87,6 +87,15 @@ export default function Workspace({
   const [judgeCheck, setJudgeCheck] = useState({ turnId: null, error: null });
 
   const messagesEndRef = useRef(null);
+
+  // After a reply arrives, show the start of the new message (question, why these models, then the answers)
+  // rather than the bottom of a long answer
+  const scrollToLatestTurn = () => {
+    const turns = document.querySelectorAll('.chat-messages-container .conversation-turn-block');
+    const latest = turns[turns.length - 1];
+    if (latest) latest.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    else messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
   const fileInputRef = useRef(null);
 
   // Load initial conversations
@@ -321,7 +330,7 @@ export default function Workspace({
       setInputPrompt('');
       setAttachedDoc(null);
       setCurrentPipelineStage(result.success ? 'critic' : 'generate');
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      setTimeout(scrollToLatestTurn, 100);
     } catch (err) {
       setSingleRun({ stage: 'error', prompt: promptToSend, error: err.message });
     } finally {
@@ -423,10 +432,7 @@ export default function Workspace({
       setAttachedDoc(null);
       setCurrentPipelineStage('branch');
 
-      // Auto scroll
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
+      setTimeout(scrollToLatestTurn, 100);
 
     } catch (err) {
       alert('Workflow execution error: ' + err.message);
@@ -1167,8 +1173,7 @@ export default function Workspace({
           display: flex;
           align-items: center;
           gap: 0.6rem;
-          overflow-x: auto;
-          padding-bottom: 0.25rem;
+          min-width: 0;
         }
         .select-bar-label {
           font-size: 0.72rem;
@@ -1176,11 +1181,17 @@ export default function Workspace({
           font-weight: 600;
           text-transform: uppercase;
           white-space: nowrap;
+          flex-shrink: 0;
         }
         .models-chips-scroll {
           display: flex;
           align-items: center;
           gap: 0.5rem;
+          overflow-x: auto;
+          flex: 1;
+          min-width: 0;
+          padding-bottom: 0.2rem;
+          scrollbar-width: thin;
         }
         .model-pill {
           display: inline-flex;
