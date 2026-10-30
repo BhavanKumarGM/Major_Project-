@@ -1,5 +1,5 @@
 /**
- * Critic AI Evaluation Engine for AI Hive Mind
+ * Critic AI Evaluation Engine for Fusion AI
  * Evidence-based evaluation system integrating deterministic rule checks,
  * task-specific verification, requirement coverage analysis, and optional LLM judging.
  */

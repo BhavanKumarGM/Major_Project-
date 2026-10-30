@@ -1,4 +1,4 @@
-// Verification script for AI Hive Mind End-to-End Workflow
+// Verification script for Fusion AI End-to-End Workflow
 import { spawn } from 'child_process';
 import fs from 'fs';
 import os from 'os';
@@ -30,7 +30,7 @@ async function ensureServer() {
 
 async function runVerification() {
   await ensureServer();
-  console.log('=== AI HIVE MIND E2E WORKFLOW VERIFICATION ===\n');
+  console.log('=== FUSION AI E2E WORKFLOW VERIFICATION ===\n');
 
   // Step 1: Pre-flight Prompt Analysis & Refinement
   const prompt = "Write a C program to check whether a number is prime and explain the logic.";

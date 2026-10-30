@@ -1,5 +1,5 @@
 /**
- * JSON File Persistence for AI Hive Mind
+ * JSON File Persistence for Fusion AI
  * Stores small state documents (conversations, analytics, settings) under DATA_DIR
  * so they survive server restarts. Writes are atomic (temp file + rename).
  */

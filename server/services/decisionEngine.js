@@ -1,5 +1,5 @@
 /**
- * Decision Model for AI Hive Mind
+ * Decision Model for Fusion AI
  * Chooses exactly one model for Single AI Mode. Ranking reuses the configured capability
  * profiles from the recommendation engine; real provider availability is a hard filter,
  * so a model without credentials is never picked for live execution.

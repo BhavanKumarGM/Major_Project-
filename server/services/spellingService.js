@@ -1,5 +1,5 @@
 /**
- * Offline Spelling & Light Grammar Correction for AI Hive Mind
+ * Offline Spelling & Light Grammar Correction for Fusion AI
  * Uses a Hunspell English dictionary (nspell + dictionary-en); no network calls.
  * Only confident fixes are applied; ambiguous words are reported, never guessed.
  * Code, URLs, emails, paths, identifiers and proper nouns are left untouched.

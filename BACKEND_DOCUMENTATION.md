@@ -1,6 +1,6 @@
-# AI HIVE MIND — Backend Architecture & Implementation Documentation
+# FUSION AI — Backend Architecture & Implementation Documentation
 
-**AI Hive Mind** is an intelligent orchestration layer and multi-LLM workspace backend built with **Node.js** and **Express**. It handles prompt analysis, automated prompt refinement, dynamic model recommendation, parallel multi-model dispatching, Critic AI evaluation, consensus synthesis, and provider-neutral branching conversation memory.
+**Fusion AI** is an intelligent orchestration layer and multi-LLM workspace backend built with **Node.js** and **Express**. It handles prompt analysis, automated prompt refinement, dynamic model recommendation, parallel multi-model dispatching, Critic AI evaluation, consensus synthesis, and provider-neutral branching conversation memory.
 
 ---
 

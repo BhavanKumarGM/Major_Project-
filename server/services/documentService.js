@@ -1,5 +1,5 @@
 /**
- * Document Processing Service for AI Hive Mind
+ * Document Processing Service for Fusion AI
  * Extracts clean text from PDF, DOCX, and plain-text files, and creates context chunks.
  */
 

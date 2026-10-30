@@ -10,7 +10,7 @@ const TEST_PORT = process.env.TEST_PORT || '5099';
 const BASE_URL = `http://127.0.0.1:${TEST_PORT}/api`;
 let serverProcess = null;
 
-describe('AI Hive Mind — Comprehensive Backend API Test Suite', () => {
+describe('Fusion AI — Comprehensive Backend API Test Suite', () => {
   before(async () => {
     // Check if server is already running
     try {

@@ -1,5 +1,5 @@
 /**
- * Prompt Analysis Engine for AI Hive Mind
+ * Prompt Analysis Engine for Fusion AI
  * Analyzes raw user prompts for intent distribution, category, constraints, and ambiguity.
  */
 

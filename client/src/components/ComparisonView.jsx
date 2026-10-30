@@ -64,7 +64,7 @@ export default function ComparisonView({
   const visibleEvaluations = (critic?.evaluations || []).filter(ev => !focusOnChosen || ev.modelId === activeSelectedModelId);
   const visibleIssues = (critic?.issues || []).filter(iss => !focusOnChosen || !iss.modelId || iss.modelId === activeSelectedModelId);
   const chosenName = chosenIsSynthesis
-    ? 'Hive Mind Synthesis'
+    ? 'Fusion AI Synthesis'
     : responses.find(r => r.modelId === activeSelectedModelId)?.modelName;
 
   const handleCopy = (id, text) => {
@@ -454,7 +454,7 @@ export default function ComparisonView({
             <div className="model-id-badge">
               <span className="avatar">🔮</span>
               <div>
-                <div className="model-name">Hive Mind Synthesis AI</div>
+                <div className="model-name">Fusion AI Synthesis</div>
                 <div className="model-sub">Consensus from {turnData.synthesis.sources?.map(s => s.name).join(' & ')}</div>
                 {turnData.synthesis.evaluation && (
                   <div className="synthesis-eval-pill">
