@@ -1,5 +1,5 @@
 /**
- * Single AI Mode Orchestration for AI Hive Mind
+ * Single AI Mode Orchestration for Fusion AI
  * Analyze → Decision Model picks one model → one generation call → Critic evaluation → save turn.
  * Dependencies are injected so the flow can be tested with a mocked LLMService.
  */
@@ -109,7 +109,7 @@ export async function executeDecision(request, { models, criticWeights, llmServi
   if (request.conversationId && inFlightConversations.has(request.conversationId)) {
     throw new RequestError(409, 'conversation_busy', 'A response is already being generated for this conversation.');
   }
-  const conversationId = request.conversationId || memoryService.createConversation('New Hive Mind Chat').id;
+  const conversationId = request.conversationId || memoryService.createConversation('New Fusion AI Chat').id;
   inFlightConversations.add(conversationId);
 
   try {

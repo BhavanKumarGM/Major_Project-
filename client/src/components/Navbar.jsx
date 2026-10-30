@@ -23,7 +23,7 @@ export default function Navbar({ activeView, setActiveView, onOpenSettings }) {
             <div className="logo-glow"></div>
           </div>
           <div className="brand-text">
-            <span className="brand-name">AI HIVE MIND</span>
+            <span className="brand-name">FUSION AI</span>
             <span className="brand-tagline">Multi-LLM Intelligence Layer</span>
           </div>
         </div>

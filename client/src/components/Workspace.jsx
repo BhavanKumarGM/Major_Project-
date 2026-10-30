@@ -149,7 +149,7 @@ export default function Workspace({
 
   const handleNewChat = async () => {
     try {
-      const conv = await api.createConversation('New Hive Mind Chat');
+      const conv = await api.createConversation('New Fusion AI Chat');
       setConversations(prev => [conv, ...prev]);
       setActiveConversation(conv);
       setActiveConversationId(conv.id);
@@ -497,7 +497,7 @@ export default function Workspace({
         <div className="sidebar-top">
           <button className="btn btn-primary btn-sm w-full" onClick={handleNewChat}>
             <Plus size={16} />
-            <span>New Hive Mind Chat</span>
+            <span>New Fusion AI Chat</span>
           </button>
 
           {/* Search */}
@@ -558,7 +558,7 @@ export default function Workspace({
         {/* Main Header / Banner */}
         <div className="main-chat-header glass-panel">
           <div className="header-left">
-            <h2 className="current-chat-title">{activeConversation?.title || 'New Hive Mind Chat'}</h2>
+            <h2 className="current-chat-title">{activeConversation?.title || 'New Fusion AI Chat'}</h2>
             <div className="mode-toggle-group">
               <span className="mode-label" id="exec-mode-label">Execution:</span>
               <div role="radiogroup" aria-labelledby="exec-mode-label" className="mode-toggle-group">
@@ -622,7 +622,7 @@ export default function Workspace({
           {(!activeConversation?.turns || activeConversation.turns.length === 0) ? (
             <div className="chat-welcome-box glass-panel">
               <div className="welcome-avatar">🧠</div>
-              <h3>Welcome to AI Hive Mind</h3>
+              <h3>Welcome to Fusion AI</h3>
               <p>
                 Enter a question or coding prompt below. The platform will analyze its intent, refine the specifications, 
                 dispatch it across your selected AI models concurrently, and provide a comprehensive <strong>Critic AI evaluation</strong>.

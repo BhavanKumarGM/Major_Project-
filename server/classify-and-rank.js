@@ -12,7 +12,7 @@ const promptArg = process.argv.slice(2).join(' ') ||
   'Write a Python script to solve knapsack problem using dynamic programming and explain time complexity.';
 
 console.log('\n===============================================================');
-console.log('🤖 AI HIVE MIND — BENCHMARK CLASSIFIER & MODEL RANKER');
+console.log('🤖 FUSION AI — BENCHMARK CLASSIFIER & MODEL RANKER');
 console.log('===============================================================\n');
 
 console.log(`📌 Input Prompt:\n"${promptArg}"\n`);

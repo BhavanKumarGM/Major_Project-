@@ -1,7 +1,7 @@
 {
-  "name": "ai-hive-mind-server",
+  "name": "fusion-ai-server",
   "version": "1.0.0",
-  "description": "Backend engine for AI Hive Mind multi-LLM workspace",
+  "description": "Backend engine for Fusion AI multi-LLM workspace",
   "main": "server.js",
   "type": "module",
   "scripts": {

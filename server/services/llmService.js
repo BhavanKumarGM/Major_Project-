@@ -1,5 +1,5 @@
 /**
- * Multi-LLM Service Orchestrator for AI Hive Mind
+ * Multi-LLM Service Orchestrator for Fusion AI
  * Dispatches prompts to real API providers (OpenAI, Gemini, Claude, Groq, Ollama)
  * Providers without credentials fall back to a clearly flagged demo simulation;
  * configured providers that fail report an error instead of fake output.

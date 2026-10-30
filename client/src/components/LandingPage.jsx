@@ -58,13 +58,13 @@ export default function LandingPage({ onStartWorkspace, onSelectSamplePrompt }) 
         </h1>
 
         <p className="hero-subtitle">
-          AI Hive Mind analyzes your prompt, refines it with precision, recommends the optimal AI models, 
+          Fusion AI analyzes your prompt, refines it with precision, recommends the optimal AI models, 
           generates parallel responses, and evaluates them with a dedicated <strong>Critic AI</strong>—putting you in complete control.
         </p>
 
         <div className="hero-cta-group">
           <button className="btn btn-primary btn-lg" onClick={() => onStartWorkspace()}>
-            <span>Start AI Hive Mind</span>
+            <span>Start Fusion AI</span>
             <ArrowRight size={18} />
           </button>
           <a href="#pipeline-demo" className="btn btn-secondary btn-lg">
@@ -88,7 +88,7 @@ export default function LandingPage({ onStartWorkspace, onSelectSamplePrompt }) 
         </div>
       </section>
 
-      {/* Animated Hive Mind Pipeline Visualization */}
+      {/* Animated Fusion AI Pipeline Visualization */}
       <section id="pipeline-demo" className="pipeline-visual-section">
         <div className="section-header">
           <span className="section-tag">Interactive Architecture</span>
@@ -225,7 +225,7 @@ export default function LandingPage({ onStartWorkspace, onSelectSamplePrompt }) 
       <section className="cta-banner-section">
         <div className="cta-banner glass-panel">
           <div className="cta-content">
-            <h2>Ready to experience the power of the Hive Mind?</h2>
+            <h2>Ready to experience the power of Fusion AI?</h2>
             <p>Start a session, test prompt refinement, and see multi-model comparison in real-time.</p>
           </div>
           <button className="btn btn-primary btn-lg" onClick={() => onStartWorkspace()}>

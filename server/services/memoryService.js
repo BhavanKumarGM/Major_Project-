@@ -1,5 +1,5 @@
 /**
- * Provider-Neutral Shared Memory & Branching Service for AI Hive Mind
+ * Provider-Neutral Shared Memory & Branching Service for Fusion AI
  * Manages multi-turn conversation trees, active branches, and cross-model context.
  */
 
@@ -48,7 +48,7 @@ class MemoryService {
     });
   }
 
-  createConversation(initialTitle = 'New Hive Mind Chat') {
+  createConversation(initialTitle = 'New Fusion AI Chat') {
     const id = uuidv4();
     const conv = {
       id,

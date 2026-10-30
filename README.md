@@ -1,7 +1,7 @@
-# AI HIVE MIND
+# FUSION AI
 *One Question. Multiple Minds. One Better Answer.*
 
-AI Hive Mind is a production-quality web-based multi-LLM assistant that acts as an intelligent orchestration layer between the user and multiple AI models.
+Fusion AI is a production-quality web-based multi-LLM assistant that acts as an intelligent orchestration layer between the user and multiple AI models.
 
 ---
 

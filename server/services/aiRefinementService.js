@@ -1,5 +1,5 @@
 /**
- * AI-Assisted Prompt Refinement for AI Hive Mind (opt-in, one billable call)
+ * AI-Assisted Prompt Refinement for Fusion AI (opt-in, one billable call)
  * Asks one configured live model to rewrite the prompt: fix spelling and grammar, make it
  * clearer and more specific, keep the intent. Falls back to the rule-based refinement on
  * any failure, and never runs on a model without credentials (no simulated rewrites).

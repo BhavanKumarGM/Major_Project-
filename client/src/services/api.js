@@ -1,5 +1,5 @@
 /**
- * AI HIVE MIND - API Client Service
+ * Fusion AI - API Client Service
  */
 
 const BASE_URL = '/api';

@@ -1,5 +1,5 @@
 /**
- * Prompt Refinement & Breakdown Engine for AI Hive Mind
+ * Prompt Refinement & Breakdown Engine for Fusion AI
  * Fixes spelling/grammar, then adds a short list of task-appropriate requirements to the
  * user's own wording (never wraps it in quotes or replaces it), and extracts a task breakdown.
  * Refining an already refined prompt does not add a second requirements block.

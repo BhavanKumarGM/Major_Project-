@@ -1,5 +1,5 @@
 /**
- * AI HIVE MIND - Main API Server
+ * Fusion AI - Main API Server
  */
 
 import express from 'express';
@@ -383,7 +383,7 @@ app.get('/api/conversations', (req, res) => {
 
 app.post('/api/conversations', (req, res) => {
   const { title } = req.body;
-  const conv = memoryService.createConversation(title || 'New Hive Mind Chat');
+  const conv = memoryService.createConversation(title || 'New Fusion AI Chat');
   res.json(conv);
 });
 
@@ -465,5 +465,5 @@ app.get('/api/stats', (req, res) => {
 });
 
 app.listen(PORT, HOST, () => {
-  console.log(`[AI Hive Mind Server] Listening on http://${HOST}:${PORT}`);
+  console.log(`[Fusion AI Server] Listening on http://${HOST}:${PORT}`);
 });

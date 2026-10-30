@@ -92,7 +92,7 @@ export default function LegalAnalyzer({ onSendToWorkspace }) {
               disabled={analyzing || !docText.trim()}
             >
               {analyzing ? <Zap size={16} className="animate-spin" /> : <Scale size={16} />}
-              <span>{analyzing ? 'Auditing Clauses Across LLMs...' : 'Audit Document with Hive Mind'}</span>
+              <span>{analyzing ? 'Auditing Clauses Across LLMs...' : 'Audit Document with Fusion AI'}</span>
             </button>
           </div>
         </div>
@@ -112,7 +112,7 @@ export default function LegalAnalyzer({ onSendToWorkspace }) {
           {!analysisResult ? (
             <div className="empty-audit-state">
               <Scale size={40} className="text-dim" />
-              <p>Click "Audit Document with Hive Mind" to trigger parallel clause extraction and multi-LLM risk scoring.</p>
+              <p>Click "Audit Document with Fusion AI" to trigger parallel clause extraction and multi-LLM risk scoring.</p>
             </div>
           ) : (
             <div className="audit-content">

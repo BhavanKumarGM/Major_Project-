@@ -1,5 +1,5 @@
 /**
- * Model Recommendation Engine for AI Hive Mind
+ * Model Recommendation Engine for Fusion AI
  * Matches prompt intent with configurable model capability profiles
  * and outputs transparent, explainable recommendations.
  */

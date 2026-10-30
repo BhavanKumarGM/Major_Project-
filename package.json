@@ -1,7 +1,7 @@
 {
-  "name": "ai-hive-mind",
+  "name": "fusion-ai",
   "version": "1.0.0",
-  "description": "AI Hive Mind - Multi-LLM Assistant with Prompt Refinement, Model Recommendation & Critic AI Evaluation",
+  "description": "Fusion AI - Multi-LLM Assistant with Prompt Refinement, Model Recommendation & Critic AI Evaluation",
   "private": true,
   "scripts": {
     "install-all": "npm install && npm install --prefix server && npm install --prefix client",

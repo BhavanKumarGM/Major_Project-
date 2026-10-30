@@ -1,4 +1,4 @@
-# AGENTS.md: AI Hive Mind project context
+# AGENTS.md: Fusion AI project context
 
 This file is for AI coding agents (and new developers) working in this repository. It describes what the app does, how the code is organized, how data flows, and the rules and known issues to keep in mind before changing anything. Paths are relative to the repo root.
 
@@ -6,7 +6,7 @@ This file is for AI coding agents (and new developers) working in this repositor
 
 ## 1. What the app is
 
-AI Hive Mind is a web app that sends one user prompt to several LLMs at once, scores their answers, and lets the user continue the conversation from whichever answer they choose.
+Fusion AI is a web app that sends one user prompt to several LLMs at once, scores their answers, and lets the user continue the conversation from whichever answer they choose.
 
 The Workspace has two execution modes (header toggle "Execution: Single AI / Multi AI"; Multi AI is the default).
 

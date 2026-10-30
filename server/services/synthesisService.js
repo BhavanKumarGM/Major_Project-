@@ -1,5 +1,5 @@
 /**
- * Synthesis Engine & Verification for AI Hive Mind
+ * Synthesis Engine & Verification for Fusion AI
  * Consolidates parallel model outputs without fabricating consensus,
  * and independently validates the synthesized answer against user requirements.
  */
@@ -14,9 +14,9 @@ export function synthesizeResponses(originalPrompt = '', refinedPrompt = '', res
   if (!responses || responses.length === 0) {
     return {
       text: 'No responses available to synthesize.',
-      modelName: 'Hive Mind Synthesis AI',
+      modelName: 'Fusion AI Synthesis',
       modelId: 'synthesis',
-      provider: 'Hive Mind Consensus',
+      provider: 'Fusion AI Consensus',
       avatar: '🔮',
       badgeColor: '#a855f7',
       isSynthesized: true,
@@ -36,9 +36,9 @@ export function synthesizeResponses(originalPrompt = '', refinedPrompt = '', res
   if (validResponses.length === 0) {
     return {
       text: 'All candidate models encountered execution errors. Unable to synthesize a verified answer.',
-      modelName: 'Hive Mind Synthesis AI',
+      modelName: 'Fusion AI Synthesis',
       modelId: 'synthesis',
-      provider: 'Hive Mind Consensus',
+      provider: 'Fusion AI Consensus',
       avatar: '🔮',
       badgeColor: '#a855f7',
       isSynthesized: true,
@@ -76,7 +76,7 @@ export function synthesizeResponses(originalPrompt = '', refinedPrompt = '', res
   let synthesisText = '';
 
   if (isCoding) {
-    synthesisText = `### 🔮 Hive Mind Synthesized Consensus Solution
+    synthesisText = `### 🔮 Fusion AI Synthesized Consensus Solution
 
 *Primary implementation selected from **${bestResponse.modelName}**${otherResponses.length > 0 ? ` with structural enhancements from ${otherResponses.map(r => r.modelName).join(', ')}` : ''}.*
 
@@ -91,7 +91,7 @@ ${bestResponse.text}
 - **Fulfillment**: Solution verified against the original request requirements.
 ${secondaryContributions.length > 0 ? secondaryContributions.map(c => `- ${c}`).join('\n') : '- **Consensus**: Candidate models concurred on the core algorithmic approach.'}`;
   } else {
-    synthesisText = `### 🔮 Hive Mind Synthesized Consensus Answer
+    synthesisText = `### 🔮 Fusion AI Synthesized Consensus Answer
 
 *Synthesized using the primary strengths of **${bestResponse.modelName}**${otherResponses.length > 0 ? ` and complementary perspectives from ${otherResponses.map(r => r.modelName).join(', ')}` : ''}.*
 
@@ -108,7 +108,7 @@ ${secondaryContributions.length > 0 ? secondaryContributions.map(c => `- ${c}`).
 
   const synthesisObj = {
     modelId: 'synthesis',
-    modelName: 'Hive Mind Synthesis AI',
+    modelName: 'Fusion AI Synthesis',
     provider: 'Multi-Model Consensus',
     avatar: '🔮',
     badgeColor: '#a855f7',
